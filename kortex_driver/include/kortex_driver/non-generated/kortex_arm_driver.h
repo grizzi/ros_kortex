@@ -80,7 +80,7 @@ class KortexArmDriver
     void initRosServices();
     void startActionServers();
 
-  private:
+  protected:
 
     ros::NodeHandle m_node_handle;
 

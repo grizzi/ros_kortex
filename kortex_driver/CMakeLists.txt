@@ -17,7 +17,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ## find catkin and any catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs controller_manager_msgs message_generation actionlib control_msgs urdf moveit_ros_planning_interface)
+find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs controller_manager_msgs message_generation actionlib control_msgs urdf moveit_ros_planning_interface controller_manager hardware_interface angles)
 find_package(Boost REQUIRED COMPONENTS system)
 
 file(GLOB_RECURSE generated_files RELATIVE ${PROJECT_SOURCE_DIR} "src/generated/robot/*.cpp" "src/generated/simulation/*.cpp")
@@ -138,6 +138,16 @@ else()
   target_link_libraries(kortex_arm_driver KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 endif()
 add_dependencies(kortex_arm_driver kortex_arm_driver_implementation)
+
+# Entry point executable for the driver
+add_executable(kortex_ros_control src/non-generated/ros_control.cpp)
+if(USE_CONAN)
+  target_link_libraries(kortex_ros_control CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
+else()
+  target_link_libraries(kortex_ros_control KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
+endif()
+add_dependencies(kortex_ros_control kortex_arm_driver_implementation)
+
 
 ## Add gtest based cpp test target and link libraries
 if(CATKIN_ENABLE_TESTING)
