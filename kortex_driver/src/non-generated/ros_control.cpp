@@ -12,14 +12,14 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "kortex_ros_control");
 
-  // if(ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug) ) {
-  //     ros::console::notifyLoggerLevelsChanged();
-  // }
-
   ros::NodeHandle n;
+  hardware_interface::KortexHardwareInterface hw(n);
 
-  kortex_hardware_interface::KortexHardwareInterface kortex_ros_control(n);
-
+  while (ros::ok()){
+    hw.read();
+    hw.update_control();
+    hw.write();
+  }
   ros::spin();
 
   return 1;

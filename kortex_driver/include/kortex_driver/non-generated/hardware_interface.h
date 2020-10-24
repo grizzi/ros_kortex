@@ -21,6 +21,7 @@
 #include "controller_manager/controller_manager.h"
 
 #include <kortex_driver/non-generated/kortex_arm_driver.h>
+#include <kortex_driver/non-generated/kortex_command_interface.h>
 
 // ros stuff
 #include <ros/ros.h>
@@ -33,33 +34,32 @@ using namespace Kinova::Api;
 using namespace Kinova::Api::BaseCyclic;
 using namespace Kinova::Api::Base;
 
-namespace kortex_hardware_interface
+namespace hardware_interface
 {
 class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
 {
  public:
+  KortexHardwareInterface() = delete;
   KortexHardwareInterface(ros::NodeHandle& nh);
   void read();
   void write();
-  void update();
+  void update_control();
   ros::Time get_time();
   ros::Duration get_period();
   ~KortexHardwareInterface();
 
  private:
-  void switch_mode(hardware_interface::JointCommandModes& new_mode);
+  bool switch_mode();
+  bool set_servoing_mode(const Kinova::Api::Base::ServoingMode& servoing_mode);
+  bool set_actuators_control_mode(const KortexControlMode& mode);
+  bool send_command();
+  void set_command(bool use_measured=false);
 
  private:
   ros::Time last_time;
   controller_manager::ControllerManager* cm;
+  hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
-  hardware_interface::PositionJointInterface jnt_pos_interface;
-  hardware_interface::VelocityJointInterface jnt_vel_interface;
-  hardware_interface::EffortJointInterface jnt_eff_interface;
-  hardware_interface::JointModeInterface jnt_mode_interface;
-
-  BaseClient* m_base;
-  BaseCyclicClient* m_basecyclic;
 
   std::vector<std::string> joint_names = {"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"};
   int NDOF = joint_names.size();
@@ -69,11 +69,10 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double pos_cmd[7];
   double vel_cmd[7];
   double eff_cmd[7];
-  double prev_pos_cmd[7];
-  double prev_vel_cmd[7];
-  double prev_eff_cmd[7];
-  hardware_interface::JointCommandModes current_mode;
-  hardware_interface::JointCommandModes mode[7];
+  hardware_interface::KortexControlMode mode;
+  hardware_interface::KortexControlMode current_mode;
+
+  Kinova::Api::BaseCyclic::Command kortex_cmd;
 };
 }
 

@@ -58,8 +58,12 @@ endforeach()
 generate_messages(DEPENDENCIES std_msgs)
 
 ## declare a catkin package
-catkin_package()
-
+##catkin_package()
+catkin_package(
+        INCLUDE_DIRS include
+        LIBRARIES kortex_arm_driver_implementation
+        CATKIN_DEPENDS ${PROJECT_DEPENDENCIES}
+)
 if(USE_CONAN)
   # Include conan.cmake module and download Kortex API from artifactory
   include(${PROJECT_SOURCE_DIR}/cmake/conan.cmake)
