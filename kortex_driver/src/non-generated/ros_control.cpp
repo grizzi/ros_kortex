@@ -6,7 +6,10 @@
  * @brief    description
  */
 
+#include <chrono>
 #include "kortex_driver/non-generated/hardware_interface.h"
+
+using namespace std::chrono;
 
 int main(int argc, char **argv)
 {
@@ -15,12 +18,9 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
   hardware_interface::KortexHardwareInterface hw(n);
 
-  while (ros::ok()){
-    hw.read();
-    hw.update_control();
-    hw.write();
-  }
-  ros::spin();
-
-  return 1;
+  hw.run();
+  ros::MultiThreadedSpinner spinner(4); // Use 4 threads
+  spinner.spin();                       // spin() will not return until the node has been shutdown
+  //ros::spin();
+  return 0;
 }

@@ -13,6 +13,8 @@
 #define KORTEX_HARDWARE_INTERFACE_H
 
 #include <cmath>
+#include <memory>
+#include <map>
 
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_mode_interface.h>
@@ -36,24 +38,31 @@ using namespace Kinova::Api::Base;
 
 namespace hardware_interface
 {
+
 class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
 {
  public:
   KortexHardwareInterface() = delete;
   KortexHardwareInterface(ros::NodeHandle& nh);
-  void read();
-  void write();
-  void update_control();
+  ~KortexHardwareInterface();
+  void run();
+
   ros::Time get_time();
   ros::Duration get_period();
-  ~KortexHardwareInterface();
 
  private:
-  bool switch_mode();
+  void read_update_loop(const double rate);
+  void write_loop();
+
+  void read();
+  void write();
+  void update();
+
   bool set_servoing_mode(const Kinova::Api::Base::ServoingMode& servoing_mode);
   bool set_actuators_control_mode(const KortexControlMode& mode);
   bool send_command();
   void set_command(bool use_measured=false);
+  void copy_commands();
 
  private:
   ros::Time last_time;
@@ -61,17 +70,29 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
 
-  std::vector<std::string> joint_names = {"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"};
+  std::vector<std::string> joint_names = {"arm_joint_1", "arm_joint_2", "arm_joint_3",
+                                          "arm_joint_4", "arm_joint_5", "arm_joint_6", "arm_joint_7"};
   int NDOF = joint_names.size();
+
   double pos[7];
   double vel[7];
   double eff[7];
   double pos_cmd[7];
   double vel_cmd[7];
   double eff_cmd[7];
+
   hardware_interface::KortexControlMode mode;
   hardware_interface::KortexControlMode current_mode;
 
+  // multi-threading
+  std::mutex cmd_mutex;
+  double pos_cmd_copy[7];
+  double vel_cmd_copy[7];
+  double eff_cmd_copy[7];
+  std::thread write_thread;
+  std::thread read_update_thread;
+
+  Feedback current_state;
   Kinova::Api::BaseCyclic::Command kortex_cmd;
 };
 }
