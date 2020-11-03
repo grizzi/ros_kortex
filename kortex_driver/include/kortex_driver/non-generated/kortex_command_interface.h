@@ -49,10 +49,26 @@ class KortexCommandHandle : public hardware_interface::JointStateHandle {
   void setMode(const mode_t& mode) noexcept { *mode_ = mode; }
 
   /**
-   * Sets the given command.
+   * Sets the given command for the current mode.
    *
    * @param[in] command Command to set.
    */
+  void setCommand(double& cmd){
+    if (*mode_ == KortexControlMode::EFFORT) *eff_ = cmd;
+    else if (*mode_ == KortexControlMode::EFFORT) *pos_ = cmd;
+    else if (*mode_ == KortexControlMode::VELOCITY) *vel_ = cmd;
+  }
+
+  /**
+   * Gets the given command for the current mode.
+   *
+   * @param[in] command Command to set.
+   */
+  double getCommand(){
+    if (*mode_ == KortexControlMode::EFFORT) return *eff_;
+    else if (*mode_ == KortexControlMode::EFFORT) return *pos_;
+    else if (*mode_ == KortexControlMode::VELOCITY) return *vel_;
+  }
 
   /**
    * Sets the given command.
