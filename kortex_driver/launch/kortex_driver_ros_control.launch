@@ -36,6 +36,8 @@
 
     <group ns="$(arg robot_name)">
         <group if="$(eval not arg('prefix'))">
+            <rosparam command="load" file="$(find kortex_driver)/joint_limits.yaml"/>
+
             <!-- Load the description for the robot -->
             <!-- Without gripper -->
             <param name="robot_description" command="$(find xacro)/xacro --inorder $(find kortex_description)/robots/$(arg arm).xacro dof:=$(arg dof) vision:=$(arg vision) sim:=false"

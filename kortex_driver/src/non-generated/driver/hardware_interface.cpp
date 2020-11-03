@@ -28,16 +28,40 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   registerInterface(&jnt_state_interface);
   registerInterface(&jnt_cmd_interface);
 
+  if (!nh.param("publish_rate", publish_rate_, 40.0)){
+    ROS_WARN_STREAM("Publish rate not set. Publishing at " << publish_rate_ << " Hz.");
+  }
+  ROS_INFO_STREAM("Publish rate not set. Publishing at " << publish_rate_ << " Hz.");
+  realtime_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/joint_commands", 4));
+
+  for (unsigned i=0; i<7; i++){
+    realtime_pub_->msg_.name.push_back(joint_names[i]);
+    realtime_pub_->msg_.position.push_back(0.0);
+    realtime_pub_->msg_.velocity.push_back(0.0);
+    realtime_pub_->msg_.effort.push_back(0.0);
+  }
+
+  set_joint_limits();
+
+  // first read and fill command
+  read();
   for (size_t i = 0; i < 7; i++) {
+    pos_cmd[i] = pos[i];
+    vel_cmd[i] = vel[i];
+    eff_cmd[i] = eff[i];
     kortex_cmd.add_actuators();
   }
-  set_command(true);
+
+  // at start up write to command the current state
   current_mode = KortexControlMode::NO_MODE;
   mode = current_mode;
+  mode_copy = current_mode;
   set_actuators_control_mode(current_mode);
 
   last_time = ros::Time::now();
   cm = new controller_manager::ControllerManager(&*this);
+
+  stop_writing = false;
 }
 
 KortexHardwareInterface::~KortexHardwareInterface(){
@@ -52,21 +76,113 @@ KortexHardwareInterface::~KortexHardwareInterface(){
 
 }
 
-void KortexHardwareInterface::run(){
-  write_thread = std::thread(&KortexHardwareInterface::write_loop, this);
-  read_update_thread = std::thread(&KortexHardwareInterface::read_update_loop, this, 100);
-  ROS_INFO_STREAM("Kinova ros controller interface is running.");
+
+void KortexHardwareInterface::set_joint_limits(){
+
+  limits_ok = true;
+  limits.resize(joint_names.size());
+  for (size_t i=0; i<joint_names.size(); i++){
+    limits_ok &= joint_limits_interface::getJointLimits(joint_names[i], m_node_handle, limits[i]);
+  }
+
+  if (!limits_ok) {
+    ROS_ERROR("Failed to parse joint limits");
+  }
+  else{
+    ROS_INFO("Limits parsed correctly");
+  }
 }
 
-void KortexHardwareInterface::read_update_loop(const double f /* 1/sec */){
+/// read loop functions
+
+void KortexHardwareInterface::read()
+{
+  current_state = m_base_cyclic->RefreshFeedback();
+  for(int i = 0; i < current_state.actuators_size(); i++)
+  {
+    pos[i] = angles::normalize_angle(static_cast<double>(M_PI * current_state.actuators(i).position()/180.0));
+    vel[i] = static_cast<double>(M_PI * current_state.actuators(i).velocity()/180.0);
+    eff[i] = static_cast<double>(-current_state.actuators(i).torque());
+    pos_cmd[i] = pos[i]; // TODO(giuseppe) make sure this happens somewhere else to avoid following errors
+  }
+}
+
+void KortexHardwareInterface::update()
+{
+  cm->update(this->get_time(), this->get_period());
+}
+
+bool KortexHardwareInterface::check_commands() {
+
+  for (size_t i = 0; i < 7; i++) {
+    pos_cmd[i] = (mode == KortexControlMode::EFFORT) ? pos[i] : pos_cmd[i]; // avoid following error
+
+    if (limits_ok){
+      //pos_cmd[i] = std::max(std::min(pos_cmd[i], limits[i].max_position), limits[i].min_position);
+      //vel_cmd[i] = std::max(std::min(vel_cmd[i], limits[i].max_velocity), -limits[i].max_velocity);
+      //eff_cmd[i] = std::max(std::min(eff_cmd[i], limits[i].max_effort), -limits[i].max_effort);
+    }
+  }
+  return true;
+}
+
+void KortexHardwareInterface::switch_mode(){
+  if (mode != current_mode){
+    ROS_INFO_STREAM("Switching to mode: " << mode);
+    set_actuators_control_mode(mode);
+    return;
+  }
+}
+
+void KortexHardwareInterface::copy_commands(){
+  std::lock_guard<std::mutex> lock(cmd_mutex);
+  mode_copy = current_mode;
+  for (size_t i=0; i<7; i++){
+    pos_cmd_copy[i] = pos_cmd[i]; // avoid following error
+    vel_cmd_copy[i] = vel_cmd[i];
+    eff_cmd_copy[i] = eff_cmd[i];
+  }
+}
+
+void KortexHardwareInterface::publish_commands() {
+
+  if (realtime_pub_->trylock()) {
+    realtime_pub_->msg_.header.stamp = ros::Time::now();
+    for (unsigned i = 0; i < 7; i++) {
+      realtime_pub_->msg_.position[i] = pos_cmd[i];
+      realtime_pub_->msg_.velocity[i] = vel_cmd[i];
+      realtime_pub_->msg_.effort[i] = eff_cmd[i];
+    }
+    realtime_pub_->unlockAndPublish();
+
+  }
+}
+
+void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
   std::chrono::time_point<std::chrono::steady_clock> start, end;
   double elapsed_ms;
   double dt_ms = 1000./f;
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
+
+    // read the latest state
     read();
+
+    // update the control commands
     update();
+
+    // check
+    check_commands();
+
+    // switch mode if required
+    switch_mode();
+
+    // copy ros commands to hardware commands
     copy_commands();
+
+    // publish commands
+    publish_commands();
+
     end = std::chrono::steady_clock::now();
     elapsed_ms = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count()/1e6;
     if (elapsed_ms > dt_ms)
@@ -77,16 +193,17 @@ void KortexHardwareInterface::read_update_loop(const double f /* 1/sec */){
   }
 }
 
+
+
 void KortexHardwareInterface::write_loop(){
   std::chrono::time_point<std::chrono::steady_clock> start, end;
   double elapsed_ms;
   double dt_ms = 1.0;
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
-    {
-      std::lock_guard<std::mutex> lock(cmd_mutex);
-      write();
-    }
+
+    write();
+
     end = std::chrono::steady_clock::now();
     elapsed_ms = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count()/1e6;
     if (elapsed_ms > dt_ms)
@@ -97,47 +214,33 @@ void KortexHardwareInterface::write_loop(){
   }
 }
 
-void KortexHardwareInterface::read()
-{
-  current_state = m_base_cyclic->RefreshFeedback();
-  for(int i = 0; i < current_state.actuators_size(); i++)
-  {
-    pos[i] = angles::normalize_angle(static_cast<double>(M_PI * current_state.actuators(i).position()/180.0));
-    vel[i] = static_cast<double>(current_state.actuators(i).velocity()/180.0*M_PI);
-    eff[i] = static_cast<double>(current_state.actuators(i).torque());
-  }
-}
-
-void KortexHardwareInterface::update()
-{
-  cm->update(this->get_time(), this->get_period());
-
-  if (mode != current_mode){
-    ROS_INFO_STREAM("Switching to mode: " << mode);
-    set_actuators_control_mode(mode);
-  }
-}
 
 void KortexHardwareInterface::write()
 {
-  if (current_mode == KortexControlMode::NO_MODE || current_mode == KortexControlMode::VELOCITY)
+  if (stop_writing) return;
+
+  std::lock_guard<std::mutex> lock(cmd_mutex);
+  if (mode_copy == KortexControlMode::POSITION || mode_copy == KortexControlMode::EFFORT)
   {
-    return;
+    set_hardware_command();
+    send_command();
   }
-  else if (current_mode == KortexControlMode::POSITION || current_mode == KortexControlMode::EFFORT)
-  {
-    set_command();
-    if (!send_command()){
-      ROS_ERROR_STREAM_THROTTLE(1.0, "Failed to send commands.");
-    }
-  }
-  else
-  {
-    ROS_WARN_STREAM_THROTTLE(1.0, "Unknown mode: " << mode);
+  else if (mode_copy == KortexControlMode::VELOCITY || mode_copy == KortexControlMode::NO_MODE){}
+  else{
+    ROS_WARN_STREAM("Unknown mode: " << mode_copy);
   }
 }
 
 
+/// Start main threads
+void KortexHardwareInterface::run(){
+  write_thread = std::thread(&KortexHardwareInterface::write_loop, this);
+  read_update_thread = std::thread(&KortexHardwareInterface::read_loop, this, 100);
+  ROS_INFO_STREAM("Kinova ros controller interface is running.");
+}
+
+
+/// Additional methods
 
 bool KortexHardwareInterface::set_servoing_mode(const Kinova::Api::Base::ServoingMode& mode) {
   bool success = false;
@@ -151,18 +254,18 @@ bool KortexHardwareInterface::set_servoing_mode(const Kinova::Api::Base::Servoin
   }
   catch (Kinova::Api::KDetailedException& ex)
   {
-    ROS_ERROR_STREAM("Kortex exception: " << ex.what());
-    ROS_ERROR_STREAM(
+    ROS_ERROR_STREAM_THROTTLE(5.0, "Kortex exception: " << ex.what());
+    ROS_ERROR_STREAM_THROTTLE(5.0,
         "Error sub-code: " << Kinova::Api::SubErrorCodes_Name(
             Kinova::Api::SubErrorCodes((ex.getErrorInfo().getError().error_sub_code()))));
   }
   catch (std::runtime_error& ex2)
   {
-    ROS_ERROR_STREAM("runtime error: " << ex2.what());
+    ROS_ERROR_STREAM_THROTTLE(5.0, "runtime error: " << ex2.what());
   }
   catch (...)
   {
-    ROS_ERROR_STREAM("Unknown error.");
+    ROS_ERROR_STREAM_THROTTLE(5.0, "Unknown error.");
   }
   return success;
 }
@@ -171,25 +274,26 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
   Kinova::Api::ActuatorConfig::ControlModeInformation control_mode_info;
   try {
     if (mode == KortexControlMode::NO_MODE || mode == KortexControlMode::VELOCITY) {
+      stop_writing = true;
       if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::SINGLE_LEVEL_SERVOING))
         return false;
-      current_mode = mode;
-      return true;
     }
     else if (mode == KortexControlMode::POSITION || mode == KortexControlMode::EFFORT) {
+      stop_writing = false;
       if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::LOW_LEVEL_SERVOING)){
         return false;
       }
-      set_command(true);
+      set_hardware_command();
       send_command();
     }
 
-    if (mode == KortexControlMode::POSITION){
-      control_mode_info.set_control_mode(Kinova::Api::ActuatorConfig::ControlMode::POSITION);
-    }
-    else if (mode == KortexControlMode::EFFORT) {
+    if (mode == KortexControlMode::EFFORT) {
       control_mode_info.set_control_mode(Kinova::Api::ActuatorConfig::ControlMode::TORQUE);
     }
+    else {
+      control_mode_info.set_control_mode(Kinova::Api::ActuatorConfig::ControlMode::POSITION);
+    }
+
 
     for (size_t i = 1; i < 8; i++) {
       m_actuator_config->SetControlMode(control_mode_info, i);
@@ -214,26 +318,17 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
   }
 }
 
-void KortexHardwareInterface::set_command(bool use_measured){
+void KortexHardwareInterface::set_hardware_command(){
   kortex_cmd.set_frame_id(kortex_cmd.frame_id() + 1);  // unique-id to reject out-of-time frames
   if (kortex_cmd.frame_id() > 65535) {
     kortex_cmd.set_frame_id(0);
   }
 
-    if (use_measured) {
-      for (int idx = 0; idx < 7; idx++) {
-        kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
-        kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(pos[idx]) * 180.0 / M_PI);
-        kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff[idx]);
-      }
-    }
-    else{
-      for (int idx = 0; idx < 7; idx++) {
-        kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
-        kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(pos_cmd_copy[idx])*180.0 / M_PI);
-        kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
-      }
-    }
+  for (int idx = 0; idx < 7; idx++) {
+    kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
+    kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(pos_cmd_copy[idx])*180.0 / M_PI);
+    kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
+  }
 }
 
 bool KortexHardwareInterface::send_command(){
@@ -258,16 +353,8 @@ bool KortexHardwareInterface::send_command(){
   {
     ROS_ERROR_STREAM("Unknown error.");
   }
-  return success;
-}
 
-void KortexHardwareInterface::copy_commands(){
-  std::lock_guard<std::mutex> lock(cmd_mutex);
-  for (size_t i=0; i<7; i++){
-    pos_cmd_copy[i] = (current_mode == KortexControlMode::EFFORT) ? pos[i] : pos_cmd[i]; // avoid following error
-    vel_cmd_copy[i] = vel_cmd[i];
-    eff_cmd_copy[i] = eff_cmd[i];
-  }
+  return success;
 }
 
 ros::Time KortexHardwareInterface::get_time()
