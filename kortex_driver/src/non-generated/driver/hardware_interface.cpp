@@ -12,11 +12,10 @@ using namespace hardware_interface;
 
 KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexArmDriver(nh)
 {
-
   for (std::size_t i = 0; i < NDOF; ++i)
   {
     // connect and register the joint state interface
-    hardware_interface::JointStateHandle state_handle(joint_names[i], &pos[i], &vel[i], &eff[i]);
+    hardware_interface::JointStateHandle state_handle(joint_names[i], &pos_wrapped[i], &vel[i], &eff[i]);
     jnt_state_interface.registerHandle(state_handle);
 
     // connect and register the joint command interface
@@ -28,19 +27,6 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   registerInterface(&jnt_state_interface);
   registerInterface(&jnt_cmd_interface);
 
-  if (!nh.param("publish_rate", publish_rate_, 40.0)){
-    ROS_WARN_STREAM("Publish rate not set. Publishing at " << publish_rate_ << " Hz.");
-  }
-  ROS_INFO_STREAM("Publish rate not set. Publishing at " << publish_rate_ << " Hz.");
-  realtime_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/joint_commands", 4));
-
-  for (unsigned i=0; i<7; i++){
-    realtime_pub_->msg_.name.push_back(joint_names[i]);
-    realtime_pub_->msg_.position.push_back(0.0);
-    realtime_pub_->msg_.velocity.push_back(0.0);
-    realtime_pub_->msg_.effort.push_back(0.0);
-  }
-
   set_joint_limits();
 
   // first read and fill command
@@ -50,6 +36,21 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     vel_cmd[i] = vel[i];
     eff_cmd[i] = eff[i];
     kortex_cmd.add_actuators();
+  }
+
+  realtime_state_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_state", 4));
+  realtime_command_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_command", 4));
+
+  for (unsigned i=0; i<7; i++){
+    realtime_state_pub_->msg_.name.push_back(joint_names[i]);
+    realtime_state_pub_->msg_.position.push_back(pos_wrapped[i]);
+    realtime_state_pub_->msg_.velocity.push_back(vel[i]);
+    realtime_state_pub_->msg_.effort.push_back(eff[i]);
+
+    realtime_command_pub_->msg_.name.push_back(joint_names[i]);
+    realtime_command_pub_->msg_.position.push_back(pos_cmd[i]);
+    realtime_command_pub_->msg_.velocity.push_back(vel_cmd[i]);
+    realtime_command_pub_->msg_.effort.push_back(eff_cmd[i]);
   }
 
   // at start up write to command the current state
@@ -94,16 +95,20 @@ void KortexHardwareInterface::set_joint_limits(){
 }
 
 /// read loop functions
-
+/// keep consistency with simulation: angle in range [-PI, PI] and unlimited continuous joints
 void KortexHardwareInterface::read()
 {
   current_state = m_base_cyclic->RefreshFeedback();
   for(int i = 0; i < current_state.actuators_size(); i++)
   {
-    pos[i] = angles::normalize_angle(static_cast<double>(M_PI * current_state.actuators(i).position()/180.0));
-    vel[i] = static_cast<double>(M_PI * current_state.actuators(i).velocity()/180.0);
+    pos[i] = angles::normalize_angle(static_cast<double>(angles::from_degrees(current_state.actuators(i).position())));
+    pos_cmd[i] = pos[i]; // avoid following errors (command position far from current position)
+
+    // wrap angle for continuous joints (the even ones)
+    pos_wrapped[i] = (i % 2) == 0 ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];
+
+    vel[i] = static_cast<double>(angles::from_degrees(current_state.actuators(i).velocity()));
     eff[i] = static_cast<double>(-current_state.actuators(i).torque());
-    pos_cmd[i] = pos[i]; // TODO(giuseppe) make sure this happens somewhere else to avoid following errors
   }
 }
 
@@ -144,17 +149,27 @@ void KortexHardwareInterface::copy_commands(){
   }
 }
 
-void KortexHardwareInterface::publish_commands() {
-
-  if (realtime_pub_->trylock()) {
-    realtime_pub_->msg_.header.stamp = ros::Time::now();
+void KortexHardwareInterface::publish_state() {
+  if (realtime_state_pub_->trylock()) {
+    realtime_state_pub_->msg_.header.stamp = ros::Time::now();
     for (unsigned i = 0; i < 7; i++) {
-      realtime_pub_->msg_.position[i] = pos_cmd[i];
-      realtime_pub_->msg_.velocity[i] = vel_cmd[i];
-      realtime_pub_->msg_.effort[i] = eff_cmd[i];
+      realtime_state_pub_->msg_.position[i] = pos_wrapped[i];
+      realtime_state_pub_->msg_.velocity[i] = vel[i];
+      realtime_state_pub_->msg_.effort[i] = eff[i];
     }
-    realtime_pub_->unlockAndPublish();
+    realtime_command_pub_->unlockAndPublish();
+  }
+}
 
+void KortexHardwareInterface::publish_commands() {
+  if (realtime_command_pub_->trylock()) {
+    realtime_command_pub_->msg_.header.stamp = ros::Time::now();
+    for (unsigned i = 0; i < 7; i++) {
+      realtime_command_pub_->msg_.position[i] = pos_cmd[i];
+      realtime_command_pub_->msg_.velocity[i] = vel_cmd[i];
+      realtime_command_pub_->msg_.effort[i] = eff_cmd[i];
+    }
+    realtime_command_pub_->unlockAndPublish();
   }
 }
 
@@ -182,6 +197,9 @@ void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
 
     // publish commands
     publish_commands();
+
+    //publish state
+    publish_state();
 
     end = std::chrono::steady_clock::now();
     elapsed_ms = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count()/1e6;
@@ -326,7 +344,7 @@ void KortexHardwareInterface::set_hardware_command(){
 
   for (int idx = 0; idx < 7; idx++) {
     kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
-    kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(pos_cmd_copy[idx])*180.0 / M_PI);
+    kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(angles::to_degrees(pos_cmd_copy[idx])));
     kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
   }
 }
@@ -355,6 +373,13 @@ bool KortexHardwareInterface::send_command(){
   }
 
   return success;
+}
+
+double KortexHardwareInterface::wrap_angle(const double a_prev, const double a_next) const{
+  double a_wrapped;
+  angles::shortest_angular_distance_with_large_limits(a_prev, a_next, std::numeric_limits<double>::min(), std::numeric_limits<double>::max(), a_wrapped);
+  a_wrapped += a_prev;
+  return a_wrapped;
 }
 
 ros::Time KortexHardwareInterface::get_time()

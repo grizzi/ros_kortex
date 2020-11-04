@@ -94,6 +94,9 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
    */
   void copy_commands();
 
+  /**
+   * @brief Dedicated function to switch between modes
+   */
   void switch_mode();
 
   /**
@@ -112,6 +115,19 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
    */
   void publish_commands();
 
+  /**
+   * @brief Publish state as sensor_msgs/JointState in a realtime safe manner
+   */
+  void publish_state();
+
+  /**
+   * @brief Returns the angle for a continuous joint when a_next is in the range [-PI, PI]
+   * @param a_prev the previous continuous joint angle [-inf, inf]
+   * @param a_next the next reading for the joint angle [-PI, PI]
+   * @return the wrapped angle
+   */
+  double wrap_angle(const double a_prev, const double a_next) const;
+
  private:
   ros::Time last_time;
   controller_manager::ControllerManager* cm;
@@ -122,12 +138,18 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
                                           "arm_joint_4", "arm_joint_5", "arm_joint_6", "arm_joint_7"};
   int NDOF = joint_names.size();
 
-  double pos[7];
+  double pos[7];                         // [-PI, PI] converted readings from actuators
+  double pos_cmd[7];                     // [-PI, PI] converted commands to actuators
+  double pos_cmd_copy[7];                // intermediate variable to reduce locking time
+  double pos_wrapped[7];                 // position reading with continuous revolution for continuous joints
+
   double vel[7];
-  double eff[7];
-  double pos_cmd[7];
   double vel_cmd[7];
+  double vel_cmd_copy[7];
+
+  double eff[7];
   double eff_cmd[7];
+  double eff_cmd_copy[7];
 
   bool limits_ok;
   std::vector<joint_limits_interface::JointLimits> limits;
@@ -137,11 +159,8 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   hardware_interface::KortexControlMode current_mode;
 
   // multi-threading
-  std::atomic_bool stop_writing;
+  std::atomic_bool stop_writing;    // when switching back to highlevel we need to stop the concurrent write
   std::mutex cmd_mutex;
-  double pos_cmd_copy[7];
-  double vel_cmd_copy[7];
-  double eff_cmd_copy[7];
 
   std::thread write_thread;
   std::thread read_update_thread;
@@ -149,8 +168,10 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   Feedback current_state;
   Kinova::Api::BaseCyclic::Command kortex_cmd;
 
-  // publish command
-  std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState> > realtime_pub_;
+  // publish state and command
+  std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState> > realtime_state_pub_;
+  std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState> > realtime_command_pub_;
+
   ros::Time last_publish_time_;
   double publish_rate_;
 };
