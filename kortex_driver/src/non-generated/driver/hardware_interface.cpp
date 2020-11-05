@@ -33,6 +33,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   read();
   for (size_t i = 0; i < 7; i++) {
     pos_cmd[i] = pos[i];
+    pos_wrapped[i] = pos[i];
     vel_cmd[i] = vel[i];
     eff_cmd[i] = eff[i];
     kortex_cmd.add_actuators();
@@ -105,7 +106,7 @@ void KortexHardwareInterface::read()
     pos_cmd[i] = pos[i]; // avoid following errors (command position far from current position)
 
     // wrap angle for continuous joints (the even ones)
-    pos_wrapped[i] = (i % 2) == 0 ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];
+    pos_wrapped[i] = ((i % 2) == 0) ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];  
 
     vel[i] = static_cast<double>(angles::from_degrees(current_state.actuators(i).velocity()));
     eff[i] = static_cast<double>(-current_state.actuators(i).torque());
@@ -157,7 +158,7 @@ void KortexHardwareInterface::publish_state() {
       realtime_state_pub_->msg_.velocity[i] = vel[i];
       realtime_state_pub_->msg_.effort[i] = eff[i];
     }
-    realtime_command_pub_->unlockAndPublish();
+    realtime_state_pub_->unlockAndPublish();
   }
 }
 
@@ -377,8 +378,8 @@ bool KortexHardwareInterface::send_command(){
 
 double KortexHardwareInterface::wrap_angle(const double a_prev, const double a_next) const{
   double a_wrapped;
-  angles::shortest_angular_distance_with_large_limits(a_prev, a_next, std::numeric_limits<double>::min(), std::numeric_limits<double>::max(), a_wrapped);
-  a_wrapped += a_prev;
+  angles::shortest_angular_distance_with_large_limits(a_prev, a_next, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(), a_wrapped);
+  a_wrapped = a_wrapped + a_prev;
   return a_wrapped;
 }
 
