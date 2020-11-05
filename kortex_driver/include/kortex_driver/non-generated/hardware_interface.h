@@ -157,6 +157,9 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double eff_cmd[7];
   double eff_cmd_copy[7];
 
+  std::vector<double> kp;
+  std::vector<double> kd;
+
   std::vector<joint_limits_interface::JointLimits> limits;
 
   hardware_interface::KortexControlMode mode;

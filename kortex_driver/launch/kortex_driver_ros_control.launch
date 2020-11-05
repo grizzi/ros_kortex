@@ -55,8 +55,9 @@
                 unless="$(eval not arg('gripper'))"/>
         </group>
 
-        <!-- Manually specified joint limits -->
+        <!-- Manually specified joint limits and low level pd gains -->
         <rosparam command="load" file="$(find kortex_driver)/joint_limits.yaml"/>
+        <rosparam command="load" file="$(find kortex_driver)/pd_gains.yaml"/>
 
         <!-- Start the kortex_driver node -->
         <node name="$(arg robot_name)_driver" pkg="kortex_driver" type="kortex_ros_control" output="screen"> <!--launch-prefix="gdb -ex run args"-->
@@ -79,6 +80,7 @@
             <rosparam command="load" file="$(find kortex_description)/arms/$(arg arm)/$(arg dof)dof/config/joint_limits.yaml" subst_value="true"/>
             <!-- If there is a gripper, load the active joint names for it -->
             <rosparam command="load" file="$(find kortex_description)/grippers/$(arg gripper)/config/joint_limits.yaml" unless="$(eval not arg('gripper'))" subst_value="true"/>
+
         </node>
         
         <!-- Start MoveIt! main executable -->

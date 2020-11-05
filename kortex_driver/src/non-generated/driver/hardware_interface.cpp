@@ -35,6 +35,32 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     initialized_ = false;
   }
 
+  if (!nh.param<std::vector<double>>("proportional_gains", kp, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})){
+    ROS_WARN("Low level p gains not specified. Setting all to zero.");
+  }
+
+  if (!nh.param<std::vector<double>>("derivative_gains", kd, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})){
+    ROS_WARN("Low level d gains not specified. Setting all to zero.");
+  }
+
+  if (kp.size() != 7) {
+    ROS_ERROR("Got %2d proportional gains, 7 required", (int)kp.size());
+    initialized_ = false;
+  }
+
+  if (kd.size() != 7) {
+    ROS_ERROR("Got %2d derivative gains, 7 required", (int)kp.size());
+    initialized_ = false;
+  }
+
+  std::stringstream kp_s{"Kp: "}, kd_s{"Kd: "};
+  for(size_t i=0; i<7; i++){
+    kp_s << " " << kp[i];
+    kd_s << " " << kd[i];
+  }
+  ROS_INFO_STREAM(kp_s.str());
+  ROS_INFO_STREAM(kd_s.str());
+
   // first read and fill command
   read();
   for (size_t i = 0; i < 7; i++) {
@@ -44,6 +70,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     eff_cmd[i] = eff[i];
     kortex_cmd.add_actuators();
   }
+  copy_commands();
 
   realtime_state_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_state", 4));
   realtime_command_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_command", 4));
@@ -68,6 +95,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
 
   last_time = ros::Time::now();
   cm = new controller_manager::ControllerManager(&*this);
+
 
   stop_writing = false;
   std::string emergency_stop_service_name = "/my_gen3/base/apply_emergency_stop";
@@ -117,7 +145,6 @@ void KortexHardwareInterface::read()
   for(int i = 0; i < current_state.actuators_size(); i++)
   {
     pos[i] = angles::normalize_angle(static_cast<double>(angles::from_degrees(current_state.actuators(i).position())));
-    pos_cmd[i] = pos[i]; // avoid following errors (command position far from current position)
 
     // wrap angle for continuous joints (the even ones)
     pos_wrapped[i] = ((i % 2) == 0) ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];  
@@ -183,9 +210,9 @@ void KortexHardwareInterface::copy_commands(){
   std::lock_guard<std::mutex> lock(cmd_mutex);
   mode_copy = current_mode;
   for (size_t i=0; i<7; i++){
-    pos_cmd_copy[i] = pos_cmd[i]; // avoid following error
+    pos_cmd_copy[i] = pos[i]; // avoid following error
     vel_cmd_copy[i] = vel_cmd[i];
-    eff_cmd_copy[i] = eff_cmd[i];
+    eff_cmd_copy[i] = eff_cmd[i] + kp[i]*(pos_cmd[i]-pos[i]) - kd[i]*vel[i]; // + feedforward torque
   }
 }
 
@@ -392,7 +419,7 @@ void KortexHardwareInterface::set_hardware_command(){
 
   for (int idx = 0; idx < 7; idx++) {
     kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
-    kortex_cmd.mutable_actuators(idx)->set_position(angles::normalize_angle_positive(angles::to_degrees(pos_cmd_copy[idx])));
+    kortex_cmd.mutable_actuators(idx)->set_position(angles::to_degrees(angles::normalize_angle_positive(pos_cmd_copy[idx])));
     kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
   }
 }
