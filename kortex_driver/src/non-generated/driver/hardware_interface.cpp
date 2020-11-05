@@ -12,6 +12,8 @@ using namespace hardware_interface;
 
 KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexArmDriver(nh)
 {
+  initialized_ = true;
+  ROS_INFO_STREAM("Starting Kinova hardware interface in namespace: " << nh.getNamespace());
   for (std::size_t i = 0; i < NDOF; ++i)
   {
     // connect and register the joint state interface
@@ -27,7 +29,11 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   registerInterface(&jnt_state_interface);
   registerInterface(&jnt_cmd_interface);
 
-  set_joint_limits();
+  bool limits_ok = set_joint_limits();
+  if (!limits_ok){
+    ROS_ERROR("Failed to set the joint limits");
+    initialized_ = false;
+  }
 
   // first read and fill command
   read();
@@ -64,6 +70,12 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   cm = new controller_manager::ControllerManager(&*this);
 
   stop_writing = false;
+  std::string emergency_stop_service_name = "/my_gen3/base/apply_emergency_stop";
+  estop_client_ = m_node_handle.serviceClient<kortex_driver::ApplyEmergencyStop>(emergency_stop_service_name);
+  if (!estop_client_.waitForExistence(ros::Duration(10.0))){
+    ROS_ERROR_STREAM("Could not contact service: " << emergency_stop_service_name);
+    initialized_ = false;
+  }
 }
 
 KortexHardwareInterface::~KortexHardwareInterface(){
@@ -79,20 +91,22 @@ KortexHardwareInterface::~KortexHardwareInterface(){
 }
 
 
-void KortexHardwareInterface::set_joint_limits(){
+bool KortexHardwareInterface::set_joint_limits(){
 
-  limits_ok = true;
+  bool limits_ok = true;
   limits.resize(joint_names.size());
   for (size_t i=0; i<joint_names.size(); i++){
     limits_ok &= joint_limits_interface::getJointLimits(joint_names[i], m_node_handle, limits[i]);
   }
-
-  if (!limits_ok) {
-    ROS_ERROR("Failed to parse joint limits");
+  if (!limits_ok){
+    return false;
   }
-  else{
-    ROS_INFO("Limits parsed correctly");
+  std::stringstream joint_limits_string;
+  for (size_t i=0; i<joint_names.size(); i++){
+    joint_limits_string << "Limits " << joint_names[i] << ": " << limits[i] << std::endl;
   }
+  ROS_INFO_STREAM(joint_limits_string.str());
+  return true;
 }
 
 /// read loop functions
@@ -118,18 +132,43 @@ void KortexHardwareInterface::update()
   cm->update(this->get_time(), this->get_period());
 }
 
-bool KortexHardwareInterface::check_commands() {
-
+void KortexHardwareInterface::enforce_limits() {
   for (size_t i = 0; i < 7; i++) {
-    pos_cmd[i] = (mode == KortexControlMode::EFFORT) ? pos[i] : pos_cmd[i]; // avoid following error
+    pos_cmd[i] = std::max(std::min(pos_cmd[i], limits[i].max_position), limits[i].min_position);
+    vel_cmd[i] = std::max(std::min(vel_cmd[i], limits[i].max_velocity), -limits[i].max_velocity);
+    eff_cmd[i] = std::max(std::min(eff_cmd[i], limits[i].max_effort), -limits[i].max_effort);
+  }
+}
 
-    if (limits_ok){
-      //pos_cmd[i] = std::max(std::min(pos_cmd[i], limits[i].max_position), limits[i].min_position);
-      //vel_cmd[i] = std::max(std::min(vel_cmd[i], limits[i].max_velocity), -limits[i].max_velocity);
-      //eff_cmd[i] = std::max(std::min(eff_cmd[i], limits[i].max_effort), -limits[i].max_effort);
+void KortexHardwareInterface::check_state() {
+  bool ok = true;
+  for (size_t i = 0; i < 7; i++) {
+    ok &= limits[i].has_position_limits ? (pos_wrapped[i] < limits[i].max_position) && (pos_wrapped[i] > limits[i].min_position) : true;
+    if (!ok) {
+      ROS_ERROR_STREAM_THROTTLE(3.0, "Joint " << i << " violated position limits: " << pos_wrapped[i]);
+      break;
+    }
+
+    ok &= limits[i].has_velocity_limits ? (vel[i] < limits[i].max_velocity) && (vel[i] > -limits[i].max_velocity) : true;
+    if (!ok) {
+      ROS_ERROR_STREAM_THROTTLE(3.0, "Joint " << i << " violated velocity limits: " << vel[i]);
+      break;
+    }
+
+    ok &= limits[i].has_effort_limits ? (eff[i] < limits[i].max_effort) && (eff[i] > -limits[i].max_effort) : true;
+    if (!ok) {
+      ROS_ERROR_STREAM_THROTTLE(3.0, "Joint " << i << " violated effort limits: " << eff[i]);
+      break;
     }
   }
-  return true;
+
+  if (!ok){
+    stop_writing = true;
+    kortex_driver::ApplyEmergencyStopRequest req;
+    kortex_driver::ApplyEmergencyStopResponse res;
+    estop_client_.call(req, res);
+  }
+
 }
 
 void KortexHardwareInterface::switch_mode(){
@@ -181,14 +220,17 @@ void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
 
+    // check the robot is safe
+    check_state();
+
     // read the latest state
     read();
 
     // update the control commands
     update();
 
-    // check
-    check_commands();
+    // commands in the limits
+    enforce_limits();
 
     // switch mode if required
     switch_mode();
@@ -253,6 +295,11 @@ void KortexHardwareInterface::write()
 
 /// Start main threads
 void KortexHardwareInterface::run(){
+  if (!initialized_){
+    ROS_ERROR_STREAM("Kinova hardware interface failed to initialize. Not running.");
+    return;
+  }
+
   write_thread = std::thread(&KortexHardwareInterface::write_loop, this);
   read_update_thread = std::thread(&KortexHardwareInterface::read_loop, this, 100);
   ROS_INFO_STREAM("Kinova ros controller interface is running.");
@@ -394,4 +441,9 @@ ros::Duration KortexHardwareInterface::get_period()
   ros::Duration period = current_time - last_time;
   last_time = current_time;
   return period;
+}
+
+std::ostream& operator<<(std::ostream& os, const joint_limits_interface::JointLimits& limits){
+  os << "q_min: " << limits.min_position << "|| q_max: " << limits.max_position << "|| v_max: " << limits.max_velocity
+  << "|| eff_max: " << limits.max_effort;
 }

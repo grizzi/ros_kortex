@@ -36,7 +36,6 @@
 
     <group ns="$(arg robot_name)">
         <group if="$(eval not arg('prefix'))">
-            <rosparam command="load" file="$(find kortex_driver)/joint_limits.yaml"/>
 
             <!-- Load the description for the robot -->
             <!-- Without gripper -->
@@ -56,7 +55,8 @@
                 unless="$(eval not arg('gripper'))"/>
         </group>
 
-
+        <!-- Manually specified joint limits -->
+        <rosparam command="load" file="$(find kortex_driver)/joint_limits.yaml"/>
 
         <!-- Start the kortex_driver node -->
         <node name="$(arg robot_name)_driver" pkg="kortex_driver" type="kortex_ros_control" output="screen"> <!--launch-prefix="gdb -ex run args"-->

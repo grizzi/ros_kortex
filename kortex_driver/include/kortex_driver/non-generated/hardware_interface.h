@@ -101,14 +101,20 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
 
   /**
    * @brief Set the joint limits from parameter file
+   * @return false if unable to set the joint limits
    */
-  void set_joint_limits();
+  bool set_joint_limits();
 
   /**
    * @brief Enforce limits and additional postprocessing
    * @return
    */
-  bool check_commands();
+  void enforce_limits();
+
+  /**
+   * @brief Make sure the state is within the limits. If not, triggers the estop
+   */
+  void check_state();
 
   /**
    * @brief Publish commands as sensor_msgs/JointState in a realtime safe manner
@@ -151,7 +157,6 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double eff_cmd[7];
   double eff_cmd_copy[7];
 
-  bool limits_ok;
   std::vector<joint_limits_interface::JointLimits> limits;
 
   hardware_interface::KortexControlMode mode;
@@ -174,8 +179,13 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
 
   ros::Time last_publish_time_;
   double publish_rate_;
+
+  bool initialized_;
+  ros::ServiceClient estop_client_;
 };
 }
+
+std::ostream& operator<<(std::ostream& os, const joint_limits_interface::JointLimits& limits);
 
 
 #endif
