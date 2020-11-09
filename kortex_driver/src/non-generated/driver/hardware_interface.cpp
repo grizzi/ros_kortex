@@ -286,7 +286,7 @@ void KortexHardwareInterface::write_loop(){
   prev_start = std::chrono::steady_clock::now();
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
-    dt = std::chrono::duration_cast<std::chrono::nanoseconds>(prev_start-start).count()/1e9;
+    dt = std::chrono::duration_cast<std::chrono::nanoseconds>(start-prev_start).count()/1e9;
     write(dt);
 
     end = std::chrono::steady_clock::now();
