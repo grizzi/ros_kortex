@@ -36,6 +36,7 @@
 #include "angles/angles.h"
 #include <realtime_tools/realtime_publisher.h>
 #include <sensor_msgs/JointState.h>
+#include <control_toolbox/pid.h>
 
 using namespace Kinova::Api;
 using namespace Kinova::Api::BaseCyclic;
@@ -60,7 +61,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   void write_loop();
 
   void read();
-  void write();
+  void write(const double dt);
   void update();
 
   /**
@@ -84,9 +85,10 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   bool send_command();
 
   /**
-   * @brief Set the hardware command variable
+   * @brief Set the hardware command from the command copy and adds feedforward pid torque
+   * @param dt the time elapsed since last call (sec)
    */
-  void set_hardware_command();
+  void set_hardware_command(const double dt);
 
 
   /**
@@ -134,12 +136,19 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
    */
   double wrap_angle(const double a_prev, const double a_next) const;
 
+  /**
+   * @brief Init low level pid controllers
+   * @return false if failed to initialize the lowlevel controller
+   */
+  bool init_pid();
+
  private:
   ros::Time last_time;
   controller_manager::ControllerManager* cm;
   hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
 
+  // TODO(giuseppe) should not be hardcoded
   std::vector<std::string> joint_names = {"arm_joint_1", "arm_joint_2", "arm_joint_3",
                                           "arm_joint_4", "arm_joint_5", "arm_joint_6", "arm_joint_7"};
   int NDOF = joint_names.size();
@@ -157,8 +166,9 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double eff_cmd[7];
   double eff_cmd_copy[7];
 
-  std::vector<double> kp;
-  std::vector<double> kd;
+  double pos_error[7];
+  double vel_error[7];
+  std::vector<control_toolbox::Pid> pid_;
 
   std::vector<joint_limits_interface::JointLimits> limits;
 
@@ -184,6 +194,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double publish_rate_;
 
   bool initialized_;
+  bool estopped_ = false;
   ros::ServiceClient estop_client_;
 };
 }

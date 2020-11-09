@@ -35,32 +35,10 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     initialized_ = false;
   }
 
-  if (!nh.param<std::vector<double>>("proportional_gains", kp, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})){
-    ROS_WARN("Low level p gains not specified. Setting all to zero.");
-  }
-
-  if (!nh.param<std::vector<double>>("derivative_gains", kd, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0})){
-    ROS_WARN("Low level d gains not specified. Setting all to zero.");
-  }
-
-  if (kp.size() != 7) {
-    ROS_ERROR("Got %2d proportional gains, 7 required", (int)kp.size());
+  if (!init_pid()){
+    ROS_ERROR("Failed to initialize the PID controllers");
     initialized_ = false;
   }
-
-  if (kd.size() != 7) {
-    ROS_ERROR("Got %2d derivative gains, 7 required", (int)kp.size());
-    initialized_ = false;
-  }
-
-  std::stringstream kp_s{"Kp: "}, kd_s{"Kd: "};
-  for(size_t i=0; i<7; i++){
-    kp_s << " " << kp[i];
-    kd_s << " " << kd[i];
-  }
-  ROS_INFO_STREAM(kp_s.str());
-  ROS_INFO_STREAM(kd_s.str());
-
   // first read and fill command
   read();
   for (size_t i = 0; i < 7; i++) {
@@ -68,6 +46,8 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     pos_wrapped[i] = pos[i];
     vel_cmd[i] = vel[i];
     eff_cmd[i] = eff[i];
+    pos_error[i] = 0.0;
+    vel_error[i] = 0.0;
     kortex_cmd.add_actuators();
   }
   copy_commands();
@@ -118,6 +98,17 @@ KortexHardwareInterface::~KortexHardwareInterface(){
 
 }
 
+bool KortexHardwareInterface::init_pid(){
+  pid_.resize(7);
+  for (size_t i=0; i<7; i++){
+    const ros::NodeHandle nh(m_node_handle.getNamespace() + "/arm_pid/" + joint_names[i]);
+    if (!pid_[i].init(nh, false)){
+      ROS_ERROR_STREAM("Failed to initialize PID controller for " << joint_names[i]);
+      return false;
+    }
+  }
+  return true;
+}
 
 bool KortexHardwareInterface::set_joint_limits(){
 
@@ -189,11 +180,12 @@ void KortexHardwareInterface::check_state() {
     }
   }
 
-  if (!ok){
+  if (!ok && !estopped_){
     stop_writing = true;
     kortex_driver::ApplyEmergencyStopRequest req;
     kortex_driver::ApplyEmergencyStopResponse res;
     estop_client_.call(req, res);
+    estopped_ = true;
   }
 
 }
@@ -212,7 +204,10 @@ void KortexHardwareInterface::copy_commands(){
   for (size_t i=0; i<7; i++){
     pos_cmd_copy[i] = pos[i]; // avoid following error
     vel_cmd_copy[i] = vel_cmd[i];
-    eff_cmd_copy[i] = eff_cmd[i] + kp[i]*(pos_cmd[i]-pos[i]) - kd[i]*vel[i]; // + feedforward torque
+    eff_cmd_copy[i] = eff_cmd[i];
+
+    pos_error[i] = pos_cmd[i] - pos_wrapped[i];
+    vel_error[i] = -vel[i];
   }
 }
 
@@ -284,13 +279,15 @@ void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
 
 
 void KortexHardwareInterface::write_loop(){
-  std::chrono::time_point<std::chrono::steady_clock> start, end;
+  std::chrono::time_point<std::chrono::steady_clock> prev_start, start, end;
   double elapsed_ms;
   double dt_ms = 1.0;
+  double dt = 0.0;
+  prev_start = std::chrono::steady_clock::now();
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
-
-    write();
+    dt = std::chrono::duration_cast<std::chrono::nanoseconds>(prev_start-start).count()/1e9;
+    write(dt);
 
     end = std::chrono::steady_clock::now();
     elapsed_ms = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count()/1e6;
@@ -299,18 +296,19 @@ void KortexHardwareInterface::write_loop(){
     else{
       std:this_thread::sleep_for(std::chrono::nanoseconds((int)((dt_ms-elapsed_ms)*1e6)));
     }
+    prev_start = start;
   }
 }
 
 
-void KortexHardwareInterface::write()
+void KortexHardwareInterface::write(const double dt)
 {
   if (stop_writing) return;
 
   std::lock_guard<std::mutex> lock(cmd_mutex);
   if (mode_copy == KortexControlMode::POSITION || mode_copy == KortexControlMode::EFFORT)
   {
-    set_hardware_command();
+    set_hardware_command(dt);
     send_command();
   }
   else if (mode_copy == KortexControlMode::VELOCITY || mode_copy == KortexControlMode::NO_MODE){}
@@ -376,7 +374,7 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
       if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::LOW_LEVEL_SERVOING)){
         return false;
       }
-      set_hardware_command();
+      set_hardware_command(0.0);
       send_command();
     }
 
@@ -411,7 +409,7 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
   }
 }
 
-void KortexHardwareInterface::set_hardware_command(){
+void KortexHardwareInterface::set_hardware_command(const double dt){
   kortex_cmd.set_frame_id(kortex_cmd.frame_id() + 1);  // unique-id to reject out-of-time frames
   if (kortex_cmd.frame_id() > 65535) {
     kortex_cmd.set_frame_id(0);
@@ -420,6 +418,8 @@ void KortexHardwareInterface::set_hardware_command(){
   for (int idx = 0; idx < 7; idx++) {
     kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
     kortex_cmd.mutable_actuators(idx)->set_position(angles::to_degrees(angles::normalize_angle_positive(pos_cmd_copy[idx])));
+
+    eff_cmd_copy[idx] += pid_[idx].computeCommand(pos_error[idx], vel_error[idx], ros::Duration(dt));
     kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
   }
 }

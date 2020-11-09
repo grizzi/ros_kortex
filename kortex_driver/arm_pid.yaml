@@ -1,0 +1,8 @@
+arm_pid:
+  arm_joint_1: {p: 10.0, i: 0.0, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_2: {p: 10.0, i: 0.0, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_3: {p: 10.0, i: 0.0, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_4: {p: 10.0, i: 0.0, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_5: {p: 10.0, i: 0.1, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_6: {p: 10.0, i: 0.1, d: 1.0, i_clamp: 2.0, antiwindup: true}
+  arm_joint_7: {p: 10.0, i: 0.1, d: 1.0, i_clamp: 2.0, antiwindup: true}
