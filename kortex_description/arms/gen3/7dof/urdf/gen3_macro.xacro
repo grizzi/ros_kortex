@@ -67,7 +67,7 @@
     </link>
     <joint
       name="${prefix}joint_1"
-      type="continuous">
+      type="revolute">
       <origin xyz="0 0 0.15643" rpy="3.1416 2.7629E-18 -4.9305E-36" />
       <parent
         link="${prefix}base_link" />
@@ -77,7 +77,7 @@
         xyz="0 0 1" />
       <limit
         effort="39"
-        velocity="1.3963" />
+        velocity="1.3963"  upper="20" lower="-20"/>
     </joint>
     <link name="${prefix}half_arm_1_link">
       <inertial>
@@ -137,7 +137,7 @@
     </link>
     <joint
       name="${prefix}joint_3"
-      type="continuous">
+      type="revolute">
       <origin xyz="0 -0.21038 -0.006375" rpy="-1.5708 1.2326E-32 -2.9122E-16" />
       <parent
         link="${prefix}half_arm_1_link" />
@@ -147,7 +147,7 @@
         xyz="0 0 1" />
       <limit
         effort="39"
-        velocity="1.3963" />
+        velocity="1.3963"  upper="20" lower="-20"/>
     </joint>
     <link name="${prefix}forearm_link">
       <inertial>
@@ -207,7 +207,7 @@
     </link>
     <joint
       name="${prefix}joint_5"
-      type="continuous">
+      type="revolute">
       <origin xyz="0 -0.20843 -0.006375" rpy="-1.5708 2.2204E-16 -6.373E-17" />
       <parent
         link="${prefix}forearm_link" />
@@ -217,7 +217,7 @@
         xyz="0 0 1" />
       <limit
         effort="9"
-        velocity="1.2218" />
+        velocity="1.2218" upper="20" lower="-20"/>
     </joint>
     <link name="${prefix}spherical_wrist_2_link">
       <inertial>
@@ -303,7 +303,7 @@
     </xacro:unless>
     <joint
       name="${prefix}joint_7"
-      type="continuous">
+      type="revolute">
       <origin xyz="0 -0.10593 -0.00017505" rpy="-1.5708 -5.5511E-17 9.6396E-17" />
       <parent
         link="${prefix}spherical_wrist_2_link" />
@@ -313,7 +313,7 @@
         xyz="0 0 1" />
       <limit
         effort="9"
-        velocity="1.2218" />
+        velocity="1.2218"  upper="20" lower="-20"/>
     </joint>
     <link name="${prefix}end_effector_link" />
     <joint
