@@ -57,7 +57,7 @@
 
         <!-- Manually specified joint limits and low level pd gains -->
         <rosparam command="load" file="$(find kortex_driver)/joint_limits.yaml"/>
-        <rosparam command="load" file="$(find kortex_driver)/arm_pid.yaml"/>
+        <rosparam command="load" file="$(find kortex_driver)/arm_pid.yaml" subst_value="true"/>
 
         <!-- Start the kortex_driver node -->
         <node name="$(arg robot_name)_driver" pkg="kortex_driver" type="kortex_ros_control" output="screen"> <!--launch-prefix="gdb -ex run args"-->
