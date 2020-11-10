@@ -67,6 +67,7 @@ KortexArmSimulation::KortexArmSimulation(ros::NodeHandle& node_handle): m_node_h
     m_arm_joint_limits_max.resize(GetDOF());
     for (int i = 0; i < GetDOF(); i++)
     {
+        m_arm_joint_names[i] = m_arm_joint_names[i];
         auto joint = model.getJoint(m_arm_joint_names[i]);
         m_arm_joint_limits_min[i] = joint->limits->lower;
         m_arm_joint_limits_max[i] = joint->limits->upper;
@@ -588,7 +589,7 @@ void KortexArmSimulation::CreateDefaultActions()
         kortex_driver::JointAngle a;
         a.joint_identifier = i;
         auto named_target = m_moveit_arm_interface->getNamedTargetValues("retract");
-        double moveit_angle = named_target["joint_"+std::to_string(i+1)]; // rad
+        double moveit_angle = named_target[m_prefix + "joint_"+std::to_string(i+1)]; // rad
         a.value = m_math_util.wrapDegreesFromZeroTo360(m_math_util.toDeg(moveit_angle));
         retract_angles.joint_angles.joint_angles.push_back(a);
     }
@@ -603,7 +604,7 @@ void KortexArmSimulation::CreateDefaultActions()
         kortex_driver::JointAngle a;
         a.joint_identifier = i;
         auto named_target = m_moveit_arm_interface->getNamedTargetValues("home");
-        double moveit_angle = named_target["joint_"+std::to_string(i+1)]; // rad
+        double moveit_angle = named_target[m_prefix + "joint_"+std::to_string(i+1)]; // rad
         a.value = m_math_util.wrapDegreesFromZeroTo360(m_math_util.toDeg(moveit_angle));
         home_angles.joint_angles.joint_angles.push_back(a);
     }
@@ -618,7 +619,7 @@ void KortexArmSimulation::CreateDefaultActions()
         kortex_driver::JointAngle a;
         a.joint_identifier = i;
         auto named_target = m_moveit_arm_interface->getNamedTargetValues("vertical");
-        double moveit_angle = named_target["joint_"+std::to_string(i+1)]; // rad
+        double moveit_angle = named_target[m_prefix + "joint_"+std::to_string(i+1)]; // rad
         a.value = m_math_util.wrapDegreesFromZeroTo360(m_math_util.toDeg(moveit_angle));
         zero_angles.joint_angles.joint_angles.push_back(a);
     }
