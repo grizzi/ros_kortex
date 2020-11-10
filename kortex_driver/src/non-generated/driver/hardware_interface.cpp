@@ -13,8 +13,15 @@ using namespace hardware_interface;
 KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexArmDriver(nh)
 {
   initialized_ = true;
+
+  // init joint names
+  joint_names.resize(7);
+  for (int i = 0; i < 7; i++){
+    joint_names[i] = m_prefix + m_arm_joint_names[i];
+  }
+
   ROS_INFO_STREAM("Starting Kinova hardware interface in namespace: " << nh.getNamespace());
-  for (std::size_t i = 0; i < NDOF; ++i)
+  for (std::size_t i = 0; i < 7; ++i)
   {
     // connect and register the joint state interface
     hardware_interface::JointStateHandle state_handle(joint_names[i], &pos_wrapped[i], &vel[i], &eff[i]);

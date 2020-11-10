@@ -148,10 +148,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
 
-  // TODO(giuseppe) should not be hardcoded
-  std::vector<std::string> joint_names = {"arm_joint_1", "arm_joint_2", "arm_joint_3",
-                                          "arm_joint_4", "arm_joint_5", "arm_joint_6", "arm_joint_7"};
-  int NDOF = joint_names.size();
+  std::vector<std::string> joint_names;
 
   double pos[7];                         // [-PI, PI] converted readings from actuators
   double pos_cmd[7];                     // [-PI, PI] converted commands to actuators
