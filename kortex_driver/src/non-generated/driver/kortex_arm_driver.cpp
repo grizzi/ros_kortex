@@ -11,6 +11,7 @@
 */
 
 #include "kortex_driver/non-generated/kortex_arm_driver.h"
+#include "angles/angles.h"
 
 KortexArmDriver::KortexArmDriver(ros::NodeHandle nh):   m_node_handle(nh), 
                                                         m_node_is_running(true), 
@@ -46,6 +47,12 @@ KortexArmDriver::KortexArmDriver(ros::NodeHandle nh):   m_node_handle(nh),
     // Start the thread to publish the feedback and joint states
     m_pub_base_feedback = m_node_handle.advertise<kortex_driver::BaseCyclic_Feedback>("base_feedback", 1000);
     m_pub_joint_state = m_node_handle.advertise<sensor_msgs::JointState>("base_feedback/joint_state", 1000);
+
+    // Initialize zero position for the joints
+    m_record_zero_position = false;
+    for (size_t i=0; i<7; i++){ m_zero_position[i] = 0.0; }
+
+    // Start publish threads
     if (m_is_real_robot)
     {
         m_publish_feedback_thread = std::thread(&KortexArmDriver::publishRobotFeedback, this);
@@ -509,9 +516,16 @@ void KortexArmDriver::initRosServices()
             m_vision_config_ros_services = nullptr;
         }
     }
+
+    m_calibration_server = m_node_handle.advertiseService("calibrate_zero_position", &KortexArmDriver::calibrateZeroPosition, this);
+
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
     ROS_INFO("Kortex Driver's services initialized correctly.");
     ROS_INFO("-------------------------------------------------");
+}
+
+bool KortexArmDriver::calibrateZeroPosition(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res){
+  m_record_zero_position = true;
 }
 
 void KortexArmDriver::startActionServers()
@@ -608,6 +622,20 @@ void KortexArmDriver::publishRobotFeedback()
         kortex_driver::BaseCyclic_Feedback base_feedback;
         ToRosData(feedback_from_api, base_feedback);
 
+        // save bias if requested
+        if (m_record_zero_position){
+          std::unique_lock<std::shared_mutex> lock(m_zero_position_mutex);
+          ROS_INFO("Resetting the zero position.");
+          for (size_t i=0; i<7; i++){
+            double to = base_feedback.actuators[i].position * M_PI/180.0;
+            double from = 0.0;
+            m_zero_position[i] = angles::shortest_angular_distance(from, to);
+            m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
+            ROS_INFO_STREAM("Zeroing position for joint " << i << " -> current is: " << to << ", zero is: " << m_zero_position[i] << " rad.");
+          }
+          m_record_zero_position = false;
+        }
+
         joint_state.name.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
         joint_state.position.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
         joint_state.velocity.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
@@ -616,8 +644,9 @@ void KortexArmDriver::publishRobotFeedback()
 
         for (int i = 0; i < base_feedback.actuators.size(); i++)
         {
+            std::shared_lock<std::shared_mutex> lock(m_zero_position_mutex);
             joint_state.name[i] = m_arm_joint_names[i];
-            joint_state.position[i] = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback.actuators[i].position));
+            joint_state.position[i] = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback.actuators[i].position) - m_zero_position[i]);
             joint_state.velocity[i] = m_math_util.toRad(base_feedback.actuators[i].velocity);
             joint_state.effort[i] = base_feedback.actuators[i].torque;
         }

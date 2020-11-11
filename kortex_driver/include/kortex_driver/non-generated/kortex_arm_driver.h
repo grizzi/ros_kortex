@@ -58,6 +58,9 @@
 #include "kortex_driver/non-generated/kortex_subscribers.h"
 #include "kortex_driver/non-generated/kortex_arm_simulation.h"
 
+#include "std_srvs/Empty.h"
+#include <shared_mutex>
+
 #define TCP_PORT 10000
 #define UDP_PORT 10001
 
@@ -165,6 +168,13 @@ class KortexArmDriver
     void publishRobotFeedback();
     void publishSimulationFeedback();
     void registerSimulationHandlers();
+
+    // Calibrate zero joint position
+    std::shared_mutex m_zero_position_mutex;
+    ros::ServiceServer m_calibration_server;
+    double m_zero_position[7];
+    std::atomic_bool m_record_zero_position;
+    bool calibrateZeroPosition(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
 };
 
 #endif
