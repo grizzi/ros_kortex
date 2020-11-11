@@ -54,7 +54,10 @@ class PreComputedJointTrajectoryActionServer
             "TRAJECTORY_EXECUTION_IN_PROGRESS"
         };
 
-    private:
+        // Set the joint bias which are removed from feeback to match encoders output
+        void set_joint_bias(const int joint_idx, const double bias_rad);
+
+ private:
         // Members
         ros::NodeHandle m_node_handle;
         actionlib::ActionServer<control_msgs::FollowJointTrajectoryAction> m_server;
@@ -96,6 +99,8 @@ class PreComputedJointTrajectoryActionServer
         void stop_all_movement();
 
         void set_server_state(ActionServerState s);
+
+        std::atomic<double> bias[7];
 
 };
 

@@ -45,6 +45,11 @@ PreComputedJointTrajectoryActionServer::PreComputedJointTrajectoryActionServer(c
         ROS_ERROR("%s", error_string.c_str());
         throw new std::runtime_error(error_string);
     }
+
+    for (size_t i=0; i<7; i++){
+      bias[i] = 0.0;
+    }
+
     // Subscribe to the arm's Action Notifications
     m_sub_action_notif_handle = m_base->OnNotificationActionTopic(std::bind(&PreComputedJointTrajectoryActionServer::action_notif_callback, this, std::placeholders::_1), Kinova::Api::Common::NotificationOptions());
 
@@ -56,6 +61,11 @@ PreComputedJointTrajectoryActionServer::PreComputedJointTrajectoryActionServer(c
 PreComputedJointTrajectoryActionServer::~PreComputedJointTrajectoryActionServer()
 {
     m_base->Unsubscribe(m_sub_action_notif_handle);
+}
+
+void PreComputedJointTrajectoryActionServer::set_joint_bias(const int joint_idx, const double bias_rad){
+  assert(joint_idx > 0 && joint_idx < 7);
+  bias[joint_idx] = bias_rad;
 }
 
 void PreComputedJointTrajectoryActionServer::goal_received_callback(actionlib::ActionServer<control_msgs::FollowJointTrajectoryAction>::GoalHandle new_goal_handle)
@@ -105,14 +115,19 @@ void PreComputedJointTrajectoryActionServer::goal_received_callback(actionlib::A
     proto_trajectory.set_mode(Kinova::Api::Base::TrajectoryContinuityMode::TRAJECTORY_CONTINUITY_MODE_POSITION);
 
     // Copy the trajectory points from the ROS structure to the Protobuf structure
+    // need to remove for every point the encoder bias so that the driver does not complain with
+    // the angles not matching the current position
     for (auto traj_point : m_goal.getGoal()->trajectory.points)
     {
         Kinova::Api::Base::PreComputedJointTrajectoryElement* proto_element = proto_trajectory.add_trajectory_elements();
         myfile << traj_point.time_from_start.toSec() << ",";
+        int joint_idx = 0;
         for (auto position : traj_point.positions)
         {
-            proto_element->add_joint_angles(m_math_util.toDeg(position));
-            myfile << position << ",";
+            double position_plus_bias = (joint_idx < 7) ? position + bias[joint_idx] : position;
+            proto_element->add_joint_angles(m_math_util.toDeg(position_plus_bias));
+            myfile << position_plus_bias << ",";
+            joint_idx++;
         }
         for (auto velocity : traj_point.velocities)
         {
@@ -493,7 +508,8 @@ bool PreComputedJointTrajectoryActionServer::is_goal_tolerance_respected(bool en
     int current_index = 0;
     for (auto act: feedback.actuators())
     {
-        double actual_position = act.position(); // in degrees
+        // recompute the actual position removing the bias so to match with real joint position (one used by moveit)
+        double actual_position = (current_index < 7) ? act.position() - m_math_util.toDeg(bias[current_index]) : act.position(); // in degrees
         double desired_position = m_math_util.wrapDegreesFromZeroTo360(m_math_util.toDeg(goal->trajectory.points.at(goal->trajectory.points.size()-1).positions[current_index]));
         double tolerance = 0.0;
 
