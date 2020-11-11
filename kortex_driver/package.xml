@@ -31,6 +31,7 @@
   <exec_depend>message_runtime</exec_depend>
 
   <depend>control_toolbox</depend>
+  <depend>std_srvs</depend>
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->
