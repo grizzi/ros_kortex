@@ -17,7 +17,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   // init joint names
   joint_names.resize(7);
   for (int i = 0; i < 7; i++){
-    joint_names[i] = m_prefix + m_arm_joint_names[i];
+    joint_names[i] = m_arm_joint_names[i];
   }
 
   ROS_INFO_STREAM("Starting Kinova hardware interface in namespace: " << nh.getNamespace());
@@ -46,6 +46,11 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     ROS_ERROR("Failed to initialize the PID controllers");
     initialized_ = false;
   }
+  // at start up write to command the current state
+  current_mode = KortexControlMode::NO_MODE;
+  mode = current_mode;
+  mode_copy = current_mode;
+
   // first read and fill command
   read();
   for (size_t i = 0; i < 7; i++) {
@@ -74,10 +79,6 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     realtime_command_pub_->msg_.effort.push_back(eff_cmd[i]);
   }
 
-  // at start up write to command the current state
-  current_mode = KortexControlMode::NO_MODE;
-  mode = current_mode;
-  mode_copy = current_mode;
   set_actuators_control_mode(current_mode);
 
   last_time = ros::Time::now();
@@ -139,13 +140,16 @@ bool KortexHardwareInterface::set_joint_limits(){
 /// keep consistency with simulation: angle in range [-PI, PI] and unlimited continuous joints
 void KortexHardwareInterface::read()
 {
-  current_state = m_base_cyclic->RefreshFeedback();
+  if (current_mode == KortexControlMode::VELOCITY || current_mode == KortexControlMode::NO_MODE)
+    current_state = m_base_cyclic->RefreshFeedback();
   for(int i = 0; i < current_state.actuators_size(); i++)
   {
+    std::shared_lock<std::shared_mutex> lock(m_zero_position_mutex);
     pos[i] = angles::normalize_angle(static_cast<double>(angles::from_degrees(current_state.actuators(i).position())));
 
-    // wrap angle for continuous joints (the even ones)
-    pos_wrapped[i] = ((i % 2) == 0) ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];  
+    // wrap angle for continuous joints (the even ones) and account for bias
+    pos_wrapped[i] = ((i % 2) == 0) ? wrap_angle(pos_wrapped[i], pos[i]) : pos[i];
+    pos_wrapped[i] -= m_zero_position[i];
 
     vel[i] = static_cast<double>(angles::from_degrees(current_state.actuators(i).velocity()));
     eff[i] = static_cast<double>(-current_state.actuators(i).torque());
@@ -435,7 +439,12 @@ bool KortexHardwareInterface::send_command(){
   bool success = false;
   try{
     ROS_INFO_ONCE("Sending first low level command");
-    m_base_cyclic->Refresh(kortex_cmd, 0);
+    auto start = std::chrono::steady_clock::now();
+    current_state = m_base_cyclic->Refresh(kortex_cmd, 0);
+    auto end = std::chrono::steady_clock::now();
+    double dt_refresh = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count()/1e6;
+    if (dt_refresh > 1.0)
+      ROS_WARN_STREAM_THROTTLE(1.0, "Refresh command took :" << dt_refresh << " ms.");
     success = true;
   }
   catch (Kinova::Api::KDetailedException& ex)
