@@ -32,6 +32,7 @@ KortexArmDriver::KortexArmDriver(ros::NodeHandle nh):   m_node_handle(nh),
         verifyProductConfiguration();
         initSubscribers();
         startActionServers();
+        setZerosFromParam();
     }    
 
     // ROS Services are always started
@@ -50,7 +51,6 @@ KortexArmDriver::KortexArmDriver(ros::NodeHandle nh):   m_node_handle(nh),
 
     // Initialize zero position for the joints
     m_record_zero_position = false;
-    for (size_t i=0; i<7; i++){ m_zero_position[i] = 0.0; }
 
     // Start publish threads
     if (m_is_real_robot)
@@ -125,6 +125,21 @@ KortexArmDriver::~KortexArmDriver()
         delete m_tcp_transport;
         delete m_udp_transport;
     }
+}
+
+void KortexArmDriver::setZerosFromParam(){
+  for (size_t i=0; i<7; i++)
+  {
+      std::string param_name = "~joint_zeros/" + m_arm_joint_names[i];
+      if (!ros::param::get(param_name, m_zero_position[i])){
+          std::string error_string = "Could not find param: " + param_name;
+          ROS_ERROR_STREAM(error_string);
+          throw new std::runtime_error(error_string);
+      }
+
+      m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
+      ROS_INFO_STREAM("Zeroing position for joint " << i << " -> zero is: " << m_zero_position[i] << " rad.");
+  }
 }
 
 void KortexArmDriver::parseRosArguments()

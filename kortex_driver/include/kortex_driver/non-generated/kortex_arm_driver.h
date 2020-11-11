@@ -168,6 +168,7 @@ class KortexArmDriver
     void publishRobotFeedback();
     void publishSimulationFeedback();
     void registerSimulationHandlers();
+    void setZerosFromParam();
 
     // Calibrate zero joint position
     std::shared_mutex m_zero_position_mutex;

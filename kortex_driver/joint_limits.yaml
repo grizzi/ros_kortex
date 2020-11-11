@@ -1,5 +1,5 @@
 joint_limits:
-  arm_joint_1:
+  $(arg prefix)joint_1:
     has_position_limits: true
     min_position: -6.28
     max_position: 6.28
@@ -12,7 +12,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 39.0
 
-  arm_joint_2:
+  $(arg prefix)joint_2:
     has_position_limits: true
     min_position: -2.41
     max_position: 2.41
@@ -25,7 +25,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 39.0
 
-  arm_joint_3:
+  $(arg prefix)joint_3:
     has_position_limits: true
     min_position: -6.28
     max_position: 6.28
@@ -38,7 +38,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 39.0
 
-  arm_joint_4:
+  $(arg prefix)joint_4:
     has_position_limits: true
     min_position: -2.66
     max_position: 2.66
@@ -51,7 +51,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 39.0
 
-  arm_joint_5:
+  $(arg prefix)joint_5:
     has_position_limits: true
     min_position: -6.28
     max_position: 6.28
@@ -64,7 +64,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 9.0
 
-  arm_joint_6:
+  $(arg prefix)joint_6:
     has_position_limits: true
     min_position: -2.23
     max_position: 2.23
@@ -77,7 +77,7 @@ joint_limits:
     has_effort_limits: true
     max_effort: 9.0
 
-  arm_joint_7:
+  $(arg prefix)joint_7:
     has_position_limits: true
     min_position: -6.28
     max_position: 6.28
