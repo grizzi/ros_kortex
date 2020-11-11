@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(kortex_driver)
 
-add_compile_options(-std=c++11)
+add_compile_options(-std=c++17)
 add_definitions(-D_OS_UNIX)
 
 option(USE_CONAN "Use the Conan package manager to automatically fetch the Kortex API" ON)
@@ -17,7 +17,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ## find catkin and any catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs control_toolbox controller_manager_msgs message_generation actionlib control_msgs urdf moveit_ros_planning_interface controller_manager hardware_interface angles)
+find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs std_srvs control_toolbox controller_manager_msgs message_generation actionlib control_msgs urdf moveit_ros_planning_interface controller_manager hardware_interface angles)
 find_package(Boost REQUIRED COMPONENTS system)
 
 file(GLOB_RECURSE generated_files RELATIVE ${PROJECT_SOURCE_DIR} "src/generated/robot/*.cpp" "src/generated/simulation/*.cpp")
