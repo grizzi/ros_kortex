@@ -14,6 +14,9 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
 {
   initialized_ = true;
 
+  // clear all faults (and set to highlevel servoing)
+  m_base->ClearFaults();
+  
   // init joint names
   joint_names.resize(7);
   for (int i = 0; i < 7; i++){
@@ -47,7 +50,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     initialized_ = false;
   }
   // at start up write to command the current state
-  current_mode = KortexControlMode::NO_MODE;
+  current_mode = KortexControlMode::VELOCITY;
   mode = current_mode;
   mode_copy = current_mode;
 
@@ -79,7 +82,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     realtime_command_pub_->msg_.effort.push_back(eff_cmd[i]);
   }
 
-  set_actuators_control_mode(current_mode);
+  //set_actuators_control_mode(current_mode);
 
   last_time = ros::Time::now();
   cm = new controller_manager::ControllerManager(&*this);
@@ -99,7 +102,7 @@ KortexHardwareInterface::~KortexHardwareInterface(){
     write_thread.join();
   }
 
-  set_actuators_control_mode(KortexControlMode::NO_MODE);
+  set_actuators_control_mode(KortexControlMode::VELOCITY);
 
   if (read_update_thread.joinable())
     read_update_thread.join();
@@ -375,12 +378,34 @@ bool KortexHardwareInterface::set_servoing_mode(const Kinova::Api::Base::Servoin
 bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode& mode) {
   Kinova::Api::ActuatorConfig::ControlModeInformation control_mode_info;
   try {
+
+    // SINGLE LEVEL SERVOING (aka high level position/velocity control)
     if (mode == KortexControlMode::NO_MODE || mode == KortexControlMode::VELOCITY) {
       stop_writing = true;
-      if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::SINGLE_LEVEL_SERVOING))
+
+      // set command as current measurement
+      bool same_as_readings = true;
+      set_hardware_command(0.0, same_as_readings);
+      send_command();
+
+      // switch actuators to position mode again
+      control_mode_info.set_control_mode(Kinova::Api::ActuatorConfig::ControlMode::POSITION);
+      for (size_t i = 1; i < 8; i++)
+        m_actuator_config->SetControlMode(control_mode_info, i);
+
+      // go to single level servoing mode
+      if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::SINGLE_LEVEL_SERVOING)){
         return false;
+      }
+      else{
+        ROS_INFO_STREAM("Mode switched to " << mode);
+        current_mode = mode;
+        return true;
+      }
     }
-    else if (mode == KortexControlMode::POSITION || mode == KortexControlMode::EFFORT) {
+
+    // LOW LEVEL SERVOING (position or torque)
+    if (mode == KortexControlMode::POSITION || mode == KortexControlMode::EFFORT) {
       stop_writing = false;
       if (!set_servoing_mode(Kinova::Api::Base::ServoingMode::LOW_LEVEL_SERVOING)){
         return false;
@@ -395,7 +420,6 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
     else {
       control_mode_info.set_control_mode(Kinova::Api::ActuatorConfig::ControlMode::POSITION);
     }
-
 
     for (size_t i = 1; i < 8; i++) {
       m_actuator_config->SetControlMode(control_mode_info, i);
@@ -420,19 +444,29 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
   }
 }
 
-void KortexHardwareInterface::set_hardware_command(const double dt){
+void KortexHardwareInterface::set_hardware_command(const double dt, bool same_as_readings){
   kortex_cmd.set_frame_id(kortex_cmd.frame_id() + 1);  // unique-id to reject out-of-time frames
   if (kortex_cmd.frame_id() > 65535) {
     kortex_cmd.set_frame_id(0);
   }
 
-  for (int idx = 0; idx < 7; idx++) {
-    kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
-    kortex_cmd.mutable_actuators(idx)->set_position(angles::to_degrees(angles::normalize_angle_positive(pos_cmd_copy[idx])));
-
-    eff_cmd_copy[idx] += pid_[idx].computeCommand(pos_error[idx], vel_error[idx], ros::Duration(dt));
-    kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
+  if (same_as_readings){
+    for (int idx = 0; idx < 7; idx++) {
+      kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
+      kortex_cmd.mutable_actuators(idx)->set_position(angles::to_degrees(angles::normalize_angle_positive(pos[idx])));
+      kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff[idx]);
+    }  
   }
+  else{
+    for (int idx = 0; idx < 7; idx++) {
+      kortex_cmd.mutable_actuators(idx)->set_command_id(kortex_cmd.frame_id());
+      kortex_cmd.mutable_actuators(idx)->set_position(angles::to_degrees(angles::normalize_angle_positive(pos_cmd_copy[idx])));
+
+      eff_cmd_copy[idx] += pid_[idx].computeCommand(pos_error[idx], vel_error[idx], ros::Duration(dt));
+      kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
+    }  
+  }
+  
 }
 
 bool KortexHardwareInterface::send_command(){

@@ -88,7 +88,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
    * @brief Set the hardware command from the command copy and adds feedforward pid torque
    * @param dt the time elapsed since last call (sec)
    */
-  void set_hardware_command(const double dt);
+  void set_hardware_command(const double dt, bool same_as_readings=false);
 
 
   /**
