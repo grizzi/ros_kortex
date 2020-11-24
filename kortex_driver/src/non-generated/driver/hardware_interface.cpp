@@ -16,7 +16,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
 
   // clear all faults (and set to highlevel servoing)
   m_base->ClearFaults();
-  
+
   // init joint names
   joint_names.resize(7);
   for (int i = 0; i < 7; i++){
@@ -380,10 +380,11 @@ bool KortexHardwareInterface::set_actuators_control_mode(const KortexControlMode
   try {
 
     // SINGLE LEVEL SERVOING (aka high level position/velocity control)
+    // switch happens in reverse mode: first actuator, then servoing mode
     if (mode == KortexControlMode::NO_MODE || mode == KortexControlMode::VELOCITY) {
       stop_writing = true;
 
-      // set command as current measurement
+      // set command same as the current measurement
       bool same_as_readings = true;
       set_hardware_command(0.0, same_as_readings);
       send_command();
