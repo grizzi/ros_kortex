@@ -147,6 +147,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   controller_manager::ControllerManager* cm;
   hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
+  hardware_interface::JointCommandInterface gripper_cmd_interface;
 
   std::vector<std::string> joint_names;
 
@@ -166,6 +167,15 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double pos_error[7];
   double vel_error[7];
   std::vector<control_toolbox::Pid> pid_;
+
+  // gripper state and command
+  double gripper_position;
+  double gripper_velocity;
+  double gripper_force;
+
+  double gripper_position_command;
+  double gripper_velocity_command;
+  double gripper_force_command;
 
   std::vector<joint_limits_interface::JointLimits> limits;
 
