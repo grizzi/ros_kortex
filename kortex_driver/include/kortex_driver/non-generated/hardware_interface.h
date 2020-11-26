@@ -147,7 +147,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   controller_manager::ControllerManager* cm;
   hardware_interface::KortexCommandInterface jnt_cmd_interface;
   hardware_interface::JointStateInterface jnt_state_interface;
-  hardware_interface::JointCommandInterface gripper_cmd_interface;
+  hardware_interface::PositionJointInterface gripper_cmd_interface;
 
   std::vector<std::string> joint_names;
 
@@ -173,6 +173,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double gripper_velocity;
   double gripper_force;
 
+  double gripper_position_error;
   double gripper_position_command;
   double gripper_velocity_command;
   double gripper_force_command;
@@ -192,6 +193,7 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
 
   Feedback current_state;
   Kinova::Api::BaseCyclic::Command kortex_cmd;
+  Kinova::Api::GripperCyclic::MotorCommand* kortex_gripper_cmd;
 
   // publish state and command
   std::shared_ptr<realtime_tools::RealtimePublisher<sensor_msgs::JointState> > realtime_state_pub_;

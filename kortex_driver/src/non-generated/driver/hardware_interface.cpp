@@ -7,6 +7,7 @@
  */
 
 #include "kortex_driver/non-generated/hardware_interface.h"
+#define GRIPPER_MINIMAL_POSITION_ERROR 1.5
 
 using namespace hardware_interface;
 
@@ -35,18 +36,18 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
         jnt_state_interface.getHandle(joint_names[i]), &pos_cmd[i], &vel_cmd[i], &eff_cmd[i], &mode);
     jnt_cmd_interface.registerHandle(cmd_handle);
   }
-
-  // gripper interface 
-  hardware_interface::JointStateHandle state_handle("gripper", &gripper_position, &gripper_velocity, &gripper_force);
-  jnt_state_interface.registerHandle(state_handle);
-
-  hardware_interface::JointHandle gripper_handle(
-        jnt_state_interface.getHandle("gripper"), &gripper_position_command);
-  gripper_cmd_interface.registerHandle(gripper_handle);
-
   registerInterface(&jnt_state_interface);
   registerInterface(&jnt_cmd_interface);
-  registerInterface(&gripper_cmd_interface);
+
+  if (isGripperPresent()){
+    hardware_interface::JointStateHandle state_handle("gripper", &gripper_position, &gripper_velocity, &gripper_force);
+    jnt_state_interface.registerHandle(state_handle);
+
+    hardware_interface::JointHandle gripper_handle(
+        jnt_state_interface.getHandle("gripper"), &gripper_position_command);
+    gripper_cmd_interface.registerHandle(gripper_handle);
+    registerInterface(&gripper_cmd_interface);
+  }
 
   bool limits_ok = set_joint_limits();
   if (!limits_ok){
@@ -90,17 +91,27 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     realtime_command_pub_->msg_.velocity.push_back(vel_cmd[i]);
     realtime_command_pub_->msg_.effort.push_back(eff_cmd[i]);
   }
-  // gripper
-  realtime_state_pub_->msg_.name.push_back("gripper");
-  realtime_state_pub_->msg_.position.push_back(gripper_position);
-  realtime_state_pub_->msg_.velocity.push_back(gripper_velocity);
-  realtime_state_pub_->msg_.effort.push_back(gripper_force);
 
-  realtime_command_pub_->msg_.name.push_back("gripper");
-  realtime_command_pub_->msg_.position.push_back(gripper_position_command);
-  realtime_command_pub_->msg_.velocity.push_back(gripper_velocity_command);
-  realtime_command_pub_->msg_.effort.push_back(gripper_force_command);
-  
+  if (isGripperPresent()){
+    realtime_state_pub_->msg_.name.push_back("gripper");
+    realtime_state_pub_->msg_.position.push_back(gripper_position);
+    realtime_state_pub_->msg_.velocity.push_back(gripper_velocity);
+    realtime_state_pub_->msg_.effort.push_back(gripper_force);
+
+    gripper_position_error = 0.0;
+    gripper_position_command = gripper_position;
+    gripper_velocity_command = gripper_velocity;
+    gripper_force_command = 10.0;  // TODO(giuseppe) hard coded -> could be set
+    kortex_gripper_cmd = kortex_cmd.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
+    kortex_gripper_cmd->set_position(gripper_position_command);
+    kortex_gripper_cmd->set_velocity(gripper_velocity_command);
+    kortex_gripper_cmd->set_force(gripper_force_command);
+
+    realtime_command_pub_->msg_.name.push_back("gripper");
+    realtime_command_pub_->msg_.position.push_back(gripper_position_command);
+    realtime_command_pub_->msg_.velocity.push_back(gripper_velocity_command);
+    realtime_command_pub_->msg_.effort.push_back(gripper_force_command);
+  }
 
   //set_actuators_control_mode(current_mode);
 
@@ -165,6 +176,7 @@ void KortexHardwareInterface::read()
 {
   if (current_mode == KortexControlMode::VELOCITY || current_mode == KortexControlMode::NO_MODE)
     current_state = m_base_cyclic->RefreshFeedback();
+
   for(int i = 0; i < current_state.actuators_size(); i++)
   {
     std::shared_lock<std::shared_mutex> lock(m_zero_position_mutex);
@@ -178,9 +190,10 @@ void KortexHardwareInterface::read()
     eff[i] = static_cast<double>(-current_state.actuators(i).torque());
   }
 
-  // gripper state
-  gripper_position = current_state.interconnect().gripper_feedback().motor()[0].position();
-  gripper_velocity = current_state.interconnect().gripper_feedback().motor()[0].velocity();
+  if (isGripperPresent()){
+    gripper_position = current_state.interconnect().gripper_feedback().motor()[0].position();
+    gripper_velocity = current_state.interconnect().gripper_feedback().motor()[0].velocity();
+  }
 }
 
 void KortexHardwareInterface::update()
@@ -249,6 +262,10 @@ void KortexHardwareInterface::copy_commands(){
     pos_error[i] = pos_cmd[i] - pos_wrapped[i];
     vel_error[i] = -vel[i];
   }
+
+  if (isGripperPresent()){
+    gripper_position_error = gripper_position_command - gripper_position;
+  }
 }
 
 void KortexHardwareInterface::publish_state() {
@@ -259,10 +276,13 @@ void KortexHardwareInterface::publish_state() {
       realtime_state_pub_->msg_.velocity[i] = vel[i];
       realtime_state_pub_->msg_.effort[i] = eff[i];
     }
-    realtime_state_pub_->msg_.position[7] = gripper_position;
-    realtime_state_pub_->msg_.velocity[7] = gripper_velocity;
-    realtime_state_pub_->msg_.effort[7] = gripper_force;
-    
+
+    if (isGripperPresent()){
+      realtime_state_pub_->msg_.position[7] = gripper_position;
+      realtime_state_pub_->msg_.velocity[7] = gripper_velocity;
+      realtime_state_pub_->msg_.effort[7] = gripper_force;
+    }
+
     realtime_state_pub_->unlockAndPublish();
   }
 }
@@ -275,10 +295,13 @@ void KortexHardwareInterface::publish_commands() {
       realtime_command_pub_->msg_.velocity[i] = vel_cmd[i];
       realtime_command_pub_->msg_.effort[i] = eff_cmd[i];
     }
-    realtime_command_pub_->msg_.position[7] = gripper_position_command;
-    realtime_command_pub_->msg_.velocity[7] = gripper_velocity_command;
-    realtime_command_pub_->msg_.effort[7] = gripper_force_command;
-    
+
+    if (isGripperPresent()){
+      realtime_command_pub_->msg_.position[7] = gripper_position_command;
+      realtime_command_pub_->msg_.velocity[7] = gripper_velocity_command;
+      realtime_command_pub_->msg_.effort[7] = gripper_force_command;
+    }
+
     realtime_command_pub_->unlockAndPublish();
   }
 }
@@ -502,14 +525,20 @@ void KortexHardwareInterface::set_hardware_command(const double dt, bool same_as
       kortex_cmd.mutable_actuators(idx)->set_torque_joint(eff_cmd_copy[idx]);
     }  
   }
-  
-  /** TODO continue(giuseppe)
-     m_gripper_motor_command = m_base_command.mutable_interconnect()->mutable_gripper_command()->add_motor_cmd();
-        m_gripper_motor_command->set_position(gripper_initial_position );
-        m_gripper_motor_command->set_velocity(0.0);
-        m_gripper_motor_command->set_force(100.0)
-  **/
-  
+
+  if (isGripperPresent()){
+    if (fabs(gripper_position_error) < GRIPPER_MINIMAL_POSITION_ERROR)
+    {
+      gripper_velocity_command = 0.0;
+    }
+    else
+    {
+      gripper_velocity_command = std::min(std::max(2.0 * fabs(gripper_position_error), 0.0), 100.0);
+    }
+    kortex_gripper_cmd->set_position(gripper_position_command);
+    kortex_gripper_cmd->set_velocity(gripper_velocity_command);
+    kortex_gripper_cmd->set_force(gripper_force_command);
+  }
 }
 
 bool KortexHardwareInterface::send_command(){
