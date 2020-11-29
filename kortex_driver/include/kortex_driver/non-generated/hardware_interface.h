@@ -180,6 +180,10 @@ class KortexHardwareInterface : hardware_interface::RobotHW, KortexArmDriver
   double vel_error[7];
   std::vector<control_toolbox::Pid> pid_;
 
+  // force-torque sensing
+  double force_[3];
+  double torque_[3];
+
   // gripper state and command
   double gripper_position;
   double gripper_velocity;

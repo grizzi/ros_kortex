@@ -117,10 +117,6 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
 
   //set_actuators_control_mode(current_mode);
 
-  last_time = ros::Time::now();
-  cm = new controller_manager::ControllerManager(&*this);
-
-
   stop_writing = false;
   std::string emergency_stop_service_name = "/my_gen3/base/apply_emergency_stop";
   estop_client_ = m_node_handle.serviceClient<kortex_driver::ApplyEmergencyStop>(emergency_stop_service_name);
@@ -153,6 +149,14 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
   fk_pos_solver_ = std::make_unique<KDL::ChainFkSolverPos_recursive>(kdlChain);
   jacobian_solver_ = std::make_unique<KDL::ChainJntToJacSolver>(kdlChain);
   init_wrench_estimator();
+
+  // FT sensor interface
+  hardware_interface::ForceTorqueSensorHandle ft_handle("ft_sensor", tip_link, force_, torque_);
+  force_torque_interface.registerHandle(ft_handle);
+  registerInterface(&force_torque_interface);
+
+  last_time = ros::Time::now();
+  cm = new controller_manager::ControllerManager(&*this);
 }
 
 KortexHardwareInterface::~KortexHardwareInterface(){
@@ -426,7 +430,12 @@ int KortexHardwareInterface::estimate_external_wrench(const double dt)
 
   // Compute End-Effector Cartesian forces from joint external torques
   external_wrench_ = jacobian_end_eff_inv_ * filtered_estimated_ext_torque_.data;
-
+  force_[0] = external_wrench_(0);
+  force_[1] = external_wrench_(1);
+  force_[2] = external_wrench_(2);
+  torque_[0] = external_wrench_(3);
+  torque_[1] = external_wrench_(4);
+  torque_[2] = external_wrench_(5);
   return 0;
 }
 
