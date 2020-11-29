@@ -7,6 +7,7 @@
  */
 
 #include "kortex_driver/non-generated/hardware_interface.h"
+
 #define GRIPPER_MINIMAL_POSITION_ERROR 1.5
 
 using namespace hardware_interface;
@@ -79,6 +80,7 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
 
   realtime_state_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_state", 4));
   realtime_command_pub_.reset(new realtime_tools::RealtimePublisher<sensor_msgs::JointState>(m_node_handle, "/kinova_ros_control/joint_command", 4));
+  realtime_wrench_pub_.reset(new realtime_tools::RealtimePublisher<geometry_msgs::WrenchStamped>(m_node_handle, "/kinova_ros_control/external_wrench", 4));
 
   for (unsigned i=0; i<7; i++){
     realtime_state_pub_->msg_.name.push_back(joint_names[i]);
@@ -126,6 +128,31 @@ KortexHardwareInterface::KortexHardwareInterface(ros::NodeHandle& nh) : KortexAr
     ROS_ERROR_STREAM("Could not contact service: " << emergency_stop_service_name);
     initialized_ = false;
   }
+
+  //KDL
+  std::string robot_description;
+  if (!m_node_handle.param<std::string>("robot_description", robot_description, "")){
+    ROS_ERROR("Failed to get robot description");
+    initialized_ = false;
+  }
+
+  if (!kdl_parser::treeFromString(robot_description, kdlTree)){
+    ROS_ERROR_STREAM("Failed to initialized the dynamic parameter solver.");
+    initialized_ = false;
+  }
+
+  std::string root_link = m_prefix + "base_link";
+  std::string tip_link = m_prefix + "tool_frame";
+  if (!kdlTree.getChain(root_link, tip_link, kdlChain))
+  {
+    ROS_ERROR("Failed to extract chain");
+    initialized_ = false;
+  }
+  KDL::Vector grav(0.0,0.0,-9.81);
+  dynamic_parameter_solver_ = std::make_unique<KDL::ChainDynParam>(kdlChain, grav);
+  fk_pos_solver_ = std::make_unique<KDL::ChainFkSolverPos_recursive>(kdlChain);
+  jacobian_solver_ = std::make_unique<KDL::ChainJntToJacSolver>(kdlChain);
+  init_wrench_estimator();
 }
 
 KortexHardwareInterface::~KortexHardwareInterface(){
@@ -285,6 +312,18 @@ void KortexHardwareInterface::publish_state() {
 
     realtime_state_pub_->unlockAndPublish();
   }
+
+  if (realtime_wrench_pub_->trylock()){
+    realtime_wrench_pub_->msg_.header.stamp = ros::Time::now();
+    realtime_wrench_pub_->msg_.header.frame_id = "arm_frame_tool"; // TODO(giuseppe) change to the right one programmtically
+    realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(0);
+    realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(1);
+    realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(2);
+    realtime_wrench_pub_->msg_.wrench.torque.x = external_wrench_(3);
+    realtime_wrench_pub_->msg_.wrench.torque.y = external_wrench_(4);
+    realtime_wrench_pub_->msg_.wrench.torque.z = external_wrench_(5);
+    realtime_wrench_pub_->unlockAndPublish();
+  }
 }
 
 void KortexHardwareInterface::publish_commands() {
@@ -306,9 +345,94 @@ void KortexHardwareInterface::publish_commands() {
   }
 }
 
+void KortexHardwareInterface::init_wrench_estimator(){
+  KDL::JntArray control_torque(7), joint_position_measured(7), joint_velocity_measured(7);
+  for(size_t i=0; i<7; i++){
+    joint_position_measured(i) = pos_wrapped[i];
+    joint_velocity_measured(i) = vel[i];
+    control_torque(i) = eff[i];
+  }
+  int solver_result = this->dynamic_parameter_solver_->JntToMass(joint_position_measured, previous_jnt_mass_matrix_);
+  initial_jnt_momentum_.data = jnt_mass_matrix_.data * joint_velocity_measured.data;
+  external_wrench_.setZero(6);
+}
+
+int KortexHardwareInterface::estimate_external_wrench(const double dt)
+{
+  /**
+  * ==========================================================================
+  * Momentum observer, implementation based on:
+  * S. Haddadin, A. De Luca and A. Albu-Schäffer,
+  * "Robot Collisions: A Survey on Detection, Isolation, and Identification,"
+  * in IEEE Transactions on Robotics, vol. 33(6), pp. 1292-1312, 2017.
+  * ==========================================================================
+  */
+
+  KDL::JntArray control_torque(7), joint_position_measured(7), joint_velocity_measured(7);
+  for(size_t i=0; i<7; i++){
+    joint_position_measured(i) = pos_wrapped[i];
+    joint_velocity_measured(i) = vel[i];
+    control_torque(i) = eff[i];
+  }
+
+  Eigen::VectorXd wrench_estimation_gain_(7);
+  wrench_estimation_gain_.setConstant(1.0);
+
+  int solver_result = this->dynamic_parameter_solver_->JntToMass(joint_position_measured, jnt_mass_matrix_);
+  if (solver_result != 0) return solver_result;
+  solver_result = this->dynamic_parameter_solver_->JntToCoriolis(joint_position_measured, joint_velocity_measured, coriolis_torque_);
+  if (solver_result != 0) return solver_result;
+  solver_result = this->dynamic_parameter_solver_->JntToGravity(joint_position_measured, gravity_torque_);
+  if (solver_result != 0) return solver_result;
+
+  jnt_mass_matrix_dot_.data = (jnt_mass_matrix_.data - previous_jnt_mass_matrix_.data) / dt;
+  previous_jnt_mass_matrix_.data = jnt_mass_matrix_.data;
+
+  total_torque_estimation_.data = control_torque.data - gravity_torque_.data - coriolis_torque_.data + jnt_mass_matrix_dot_.data * joint_velocity_measured.data;
+  // total_torque_estimation_.data = -joint_torque_measured.data - gravity_torque_.data - coriolis_torque_.data + jnt_mass_matrix_dot_.data * joint_velocity_measured.data;
+
+  estimated_momentum_integral_.data += (total_torque_estimation_.data + estimated_ext_torque_.data) * dt;
+
+  model_based_jnt_momentum_.data = jnt_mass_matrix_.data * joint_velocity_measured.data;
+  estimated_ext_torque_.data = wrench_estimation_gain_.asDiagonal() * (model_based_jnt_momentum_.data -
+      estimated_momentum_integral_.data -
+      initial_jnt_momentum_.data);
+
+  // First order low-pass filter
+  double alpha = 0.5;
+  for (int i = 0; i < 7; i++)
+    filtered_estimated_ext_torque_(i) = alpha * filtered_estimated_ext_torque_(i) + (1.0 - alpha) * estimated_ext_torque_(i);
+
+  /**
+  * ========================================================================================
+  * Propagate joint torques to Cartesian wrench using a pseudo inverse of Jacobian-Transpose
+  * ========================================================================================
+  */
+  solver_result = jacobian_solver_->JntToJac(joint_position_measured, jacobian_end_eff_);
+  if (solver_result != 0) return solver_result;
+
+  solver_result = fk_pos_solver_->JntToCart(joint_position_measured, tool_tip_frame_full_model_);
+  if (solver_result != 0) return solver_result;
+
+  // Transform the jacobian from the base to the tool-tip frame
+  jacobian_end_eff_.changeBase(tool_tip_frame_full_model_.M.Inverse());
+
+  // Compute SVD of the jacobian using Eigen functions
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian_end_eff_.data.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+  Eigen::VectorXd singular_inv(svd.singularValues());
+  for (int j = 0; j < singular_inv.size(); ++j) singular_inv(j) = (singular_inv(j) < 1e-8) ? 0.0 : 1.0 / singular_inv(j);
+  jacobian_end_eff_inv_.noalias() = svd.matrixV() * singular_inv.matrix().asDiagonal() * svd.matrixU().adjoint();
+
+  // Compute End-Effector Cartesian forces from joint external torques
+  external_wrench_ = jacobian_end_eff_inv_ * filtered_estimated_ext_torque_.data;
+
+  return 0;
+}
+
 void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
   std::chrono::time_point<std::chrono::steady_clock> start, end;
-  double elapsed_ms;
+  double elapsed_ms = 0.0;
   double dt_ms = 1000./f;
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
@@ -318,6 +442,8 @@ void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
 
     // read the latest state
     read();
+
+    estimate_external_wrench(elapsed_ms/1000.0); // TODO(giuseppe) this is bad timing at the first tick
 
     // update the control commands
     update();
