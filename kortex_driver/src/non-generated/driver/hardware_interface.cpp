@@ -321,8 +321,8 @@ void KortexHardwareInterface::publish_state() {
     realtime_wrench_pub_->msg_.header.stamp = ros::Time::now();
     realtime_wrench_pub_->msg_.header.frame_id = "arm_frame_tool"; // TODO(giuseppe) change to the right one programmtically
     realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(0);
-    realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(1);
-    realtime_wrench_pub_->msg_.wrench.force.x = external_wrench_(2);
+    realtime_wrench_pub_->msg_.wrench.force.y = external_wrench_(1);
+    realtime_wrench_pub_->msg_.wrench.force.z = external_wrench_(2);
     realtime_wrench_pub_->msg_.wrench.torque.x = external_wrench_(3);
     realtime_wrench_pub_->msg_.wrench.torque.y = external_wrench_(4);
     realtime_wrench_pub_->msg_.wrench.torque.z = external_wrench_(5);
@@ -356,8 +356,22 @@ void KortexHardwareInterface::init_wrench_estimator(){
     joint_velocity_measured(i) = vel[i];
     control_torque(i) = eff[i];
   }
+  
+  previous_jnt_mass_matrix_.resize(7);
+  jnt_mass_matrix_.resize(7);
+  jnt_mass_matrix_dot_.resize(7);
+  coriolis_torque_.resize(7);
+  gravity_torque_.resize(7);
+  estimated_ext_torque_.resize(7);
+  filtered_estimated_ext_torque_.resize(7);
+  model_based_jnt_momentum_.resize(7);
+  estimated_momentum_integral_.resize(7);
+  initial_jnt_momentum_.resize(7);
+  jacobian_end_eff_.resize(7);
+
   int solver_result = this->dynamic_parameter_solver_->JntToMass(joint_position_measured, previous_jnt_mass_matrix_);
-  initial_jnt_momentum_.data = jnt_mass_matrix_.data * joint_velocity_measured.data;
+  initial_jnt_momentum_.data = previous_jnt_mass_matrix_.data * joint_velocity_measured.data;
+  std::cout << "Initial joint momentum is: " << initial_jnt_momentum_.data.transpose() << std::endl;
   external_wrench_.setZero(6);
 }
 
@@ -380,54 +394,80 @@ int KortexHardwareInterface::estimate_external_wrench(const double dt)
   }
 
   Eigen::VectorXd wrench_estimation_gain_(7);
-  wrench_estimation_gain_.setConstant(1.0);
+  wrench_estimation_gain_.setConstant(100.0);
 
+  
   int solver_result = this->dynamic_parameter_solver_->JntToMass(joint_position_measured, jnt_mass_matrix_);
-  if (solver_result != 0) return solver_result;
+  if (solver_result != 0){
+    std::cout << "JntToMass failed: " << jacobian_solver_->strError(solver_result) << std::endl;
+    return solver_result;
+  }
+
   solver_result = this->dynamic_parameter_solver_->JntToCoriolis(joint_position_measured, joint_velocity_measured, coriolis_torque_);
-  if (solver_result != 0) return solver_result;
+  if (solver_result != 0){
+    std::cout << "JntToCoriolis failed: " << jacobian_solver_->strError(solver_result)  << std::endl;
+    return solver_result;
+  }
+  
   solver_result = this->dynamic_parameter_solver_->JntToGravity(joint_position_measured, gravity_torque_);
-  if (solver_result != 0) return solver_result;
+  if (solver_result != 0){
+    std::cout << "JntToGravity failed: " << jacobian_solver_->strError(solver_result)  << std::endl;
+    return solver_result;
+  }
 
   jnt_mass_matrix_dot_.data = (jnt_mass_matrix_.data - previous_jnt_mass_matrix_.data) / dt;
   previous_jnt_mass_matrix_.data = jnt_mass_matrix_.data;
-
+  
+  std::cout << "jnt mass matrix dot is: " << jnt_mass_matrix_dot_.data.transpose() << std::endl;
+  std::cout << "jnt position: " << joint_position_measured.data.transpose() << std::endl;
+  std::cout << "jnt velocity: " << joint_velocity_measured.data.transpose() << std::endl;
+  std::cout << "jnt torques: " << control_torque.data.transpose() << std::endl;
   total_torque_estimation_.data = control_torque.data - gravity_torque_.data - coriolis_torque_.data + jnt_mass_matrix_dot_.data * joint_velocity_measured.data;
+  std::cout << "total torque estimation is: " << total_torque_estimation_.data.transpose() << std::endl;
   // total_torque_estimation_.data = -joint_torque_measured.data - gravity_torque_.data - coriolis_torque_.data + jnt_mass_matrix_dot_.data * joint_velocity_measured.data;
-
   estimated_momentum_integral_.data += (total_torque_estimation_.data + estimated_ext_torque_.data) * dt;
-
+  std::cout << "Estimated momentum integral is :" << estimated_momentum_integral_.data.transpose() << std::endl;
+  
   model_based_jnt_momentum_.data = jnt_mass_matrix_.data * joint_velocity_measured.data;
+  std::cout << "Model based momentum is :" << model_based_jnt_momentum_.data.transpose() << std::endl;
+  
   estimated_ext_torque_.data = wrench_estimation_gain_.asDiagonal() * (model_based_jnt_momentum_.data -
       estimated_momentum_integral_.data -
       initial_jnt_momentum_.data);
-
+  std::cout << "estimated ext torque: " << estimated_ext_torque_.data.transpose() << std::endl;
+  
   // First order low-pass filter
   double alpha = 0.5;
   for (int i = 0; i < 7; i++)
     filtered_estimated_ext_torque_(i) = alpha * filtered_estimated_ext_torque_(i) + (1.0 - alpha) * estimated_ext_torque_(i);
-
+  std::cout << "estimated ext torque filtered: " << filtered_estimated_ext_torque_.data.transpose() << std::endl;
+  
   /**
   * ========================================================================================
   * Propagate joint torques to Cartesian wrench using a pseudo inverse of Jacobian-Transpose
   * ========================================================================================
   */
   solver_result = jacobian_solver_->JntToJac(joint_position_measured, jacobian_end_eff_);
-  if (solver_result != 0) return solver_result;
+  if (solver_result != 0){
+    std::cout << "JntToJac failed: " << jacobian_solver_->strError(solver_result) << std::endl;
+    return solver_result;
+  }
 
   solver_result = fk_pos_solver_->JntToCart(joint_position_measured, tool_tip_frame_full_model_);
-  if (solver_result != 0) return solver_result;
+    if (solver_result != 0){
+    std::cout << "JntToCart failed: " << fk_pos_solver_->strError(solver_result) << std::endl;
+    return solver_result;
+  }
 
   // Transform the jacobian from the base to the tool-tip frame
   jacobian_end_eff_.changeBase(tool_tip_frame_full_model_.M.Inverse());
 
   // Compute SVD of the jacobian using Eigen functions
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian_end_eff_.data.transpose(), Eigen::ComputeThinU | Eigen::ComputeThinV);
-
   Eigen::VectorXd singular_inv(svd.singularValues());
-  for (int j = 0; j < singular_inv.size(); ++j) singular_inv(j) = (singular_inv(j) < 1e-8) ? 0.0 : 1.0 / singular_inv(j);
+  for (int j = 0; j < singular_inv.size(); ++j) singular_inv(j) = (singular_inv(j) < 1e-6) ? 0.0 : 1.0 / singular_inv(j);
   jacobian_end_eff_inv_.noalias() = svd.matrixV() * singular_inv.matrix().asDiagonal() * svd.matrixU().adjoint();
-
+  
   // Compute End-Effector Cartesian forces from joint external torques
   external_wrench_ = jacobian_end_eff_inv_ * filtered_estimated_ext_torque_.data;
   force_[0] = external_wrench_(0);
@@ -441,8 +481,8 @@ int KortexHardwareInterface::estimate_external_wrench(const double dt)
 
 void KortexHardwareInterface::read_loop(const double f /* 1/sec */){
   std::chrono::time_point<std::chrono::steady_clock> start, end;
-  double elapsed_ms = 0.0;
   double dt_ms = 1000./f;
+  double elapsed_ms = dt_ms;
   while (ros::ok()){
     start = std::chrono::steady_clock::now();
 
