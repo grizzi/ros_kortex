@@ -28,3 +28,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 # To add your Gazebo plugin to this package, put your source file under src and uncomment/modify those lines
 # add_library(my_gazebo_plugin SHARED src/my_gazebo_plugin.cpp)
 # target_link_libraries(my_gazebo_plugin ${GAZEBO_LIBRARIES})
+
+catkin_install_python(PROGRAMS scripts/home_robot.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
