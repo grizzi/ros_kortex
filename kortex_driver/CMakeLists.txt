@@ -165,17 +165,6 @@ else()
 endif()
 add_dependencies(kortex_arm_driver kortex_arm_driver_implementation)
 
-# Entry point executable for the driver
-add_executable(kortex_ros_control src/non-generated/ros_control.cpp)
-if(USE_CONAN)
-  target_link_libraries(kortex_ros_control CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
-else()
-#  target_link_libraries(kortex_ros_control KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
-  target_link_libraries(kortex_ros_control ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
-endif()
-add_dependencies(kortex_ros_control kortex_arm_driver_implementation)
-
-
 ## Add gtest based cpp test target and link libraries
 if(CATKIN_ENABLE_TESTING)
 	find_package(rostest REQUIRED)
