@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/controlconfig_services_interface.h"
 
-#include <ControlConfig.pb.h>
-#include <ControlConfigClientRpc.h>
+#include <kortex_api/messages/ControlConfig.pb.h>
+#include <kortex_api/client_stubs/ControlConfigClientRpc.h>
 
 using namespace std;
 

@@ -25,7 +25,7 @@
 #include <iostream>
 #include <chrono>
 
-#include <ActuatorConfig.pb.h>
+#include <kortex_api/messages/ActuatorConfig.pb.h>
 
 #include "kortex_driver/generated/robot/common_proto_converter.h"
 #include "kortex_driver/generated/robot/actuatorcyclic_proto_converter.h"

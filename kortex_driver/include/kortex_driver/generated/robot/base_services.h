@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/base_services_interface.h"
 
-#include <Base.pb.h>
-#include <BaseClientRpc.h>
+#include <kortex_api/messages/Base.pb.h>
+#include <kortex_api/client_stubs//BaseClientRpc.h>
 
 using namespace std;
 

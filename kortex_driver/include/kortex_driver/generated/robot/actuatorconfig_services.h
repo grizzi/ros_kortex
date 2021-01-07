@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/actuatorconfig_services_interface.h"
 
-#include <ActuatorConfig.pb.h>
-#include <ActuatorConfigClientRpc.h>
+#include <kortex_api/messages/ActuatorConfig.pb.h>
+#include <kortex_api/client_stubs/ActuatorConfigClientRpc.h>
 
 using namespace std;
 

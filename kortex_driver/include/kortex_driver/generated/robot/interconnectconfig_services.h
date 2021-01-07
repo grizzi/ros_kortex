@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/interconnectconfig_services_interface.h"
 
-#include <InterconnectConfig.pb.h>
-#include <InterconnectConfigClientRpc.h>
+#include <kortex_api/messages/InterconnectConfig.pb.h>
+#include <kortex_api/client_stubs/InterconnectConfigClientRpc.h>
 
 using namespace std;
 

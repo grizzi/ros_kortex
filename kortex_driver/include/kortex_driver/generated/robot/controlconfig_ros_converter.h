@@ -25,7 +25,7 @@
 #include <iostream>
 #include <chrono>
 
-#include <ControlConfig.pb.h>
+#include <kortex_api/messages/ControlConfig.pb.h>
 
 #include "kortex_driver/generated/robot/common_ros_converter.h"
 #include "kortex_driver/generated/robot/actuatorconfig_ros_converter.h"

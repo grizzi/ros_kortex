@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/devicemanager_services_interface.h"
 
-#include <DeviceManager.pb.h>
-#include <DeviceManagerClientRpc.h>
+#include <kortex_api/messages/DeviceManager.pb.h>
+#include <kortex_api/client_stubs/DeviceManagerClientRpc.h>
 
 using namespace std;
 

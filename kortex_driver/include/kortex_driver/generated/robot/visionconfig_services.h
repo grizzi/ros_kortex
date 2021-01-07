@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/visionconfig_services_interface.h"
 
-#include <VisionConfig.pb.h>
-#include <VisionConfigClientRpc.h>
+#include <kortex_api/messages/VisionConfig.pb.h>
+#include <kortex_api/client_stubs/VisionConfigClientRpc.h>
 
 using namespace std;
 

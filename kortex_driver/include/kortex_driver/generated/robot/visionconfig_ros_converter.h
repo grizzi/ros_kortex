@@ -25,7 +25,7 @@
 #include <iostream>
 #include <chrono>
 
-#include <VisionConfig.pb.h>
+#include <kortex_api/messages/VisionConfig.pb.h>
 
 #include "kortex_driver/generated/robot/common_ros_converter.h"
 #include "kortex_driver/generated/robot/actuatorconfig_ros_converter.h"

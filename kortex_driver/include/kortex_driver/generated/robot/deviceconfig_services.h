@@ -19,8 +19,8 @@
 
 #include "kortex_driver/generated/interfaces/deviceconfig_services_interface.h"
 
-#include <DeviceConfig.pb.h>
-#include <DeviceConfigClientRpc.h>
+#include <kortex_api/messages/DeviceConfig.pb.h>
+#include <kortex_api/client_stubs/DeviceConfigClientRpc.h>
 
 using namespace std;
 
