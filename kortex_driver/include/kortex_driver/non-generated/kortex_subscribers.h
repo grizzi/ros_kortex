@@ -16,7 +16,7 @@
 #include <ros/ros.h>
 #include "std_msgs/Empty.h"
 #include <thread>
-#include "BaseClientRpc.h"
+#include "kortex_api/client_stubs/BaseClientRpc.h"
 
 #include "kortex_driver/TwistCommand.h"
 #include "kortex_driver/Base_JointSpeeds.h"

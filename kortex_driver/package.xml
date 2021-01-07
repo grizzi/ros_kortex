@@ -11,23 +11,20 @@
   <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>control_msgs</build_depend>
-  <build_depend>controller_manager_msgs</build_depend>
-  <build_depend>hardware_interface</build_depend>
-  <build_depend>angles</build_depend>
-  <build_depend>actionlib</build_depend>
-  <build_depend>moveit_ros_planning_interface</build_depend>
-  <build_depend>kdl_parser</build_depend>
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>std_msgs</build_export_depend>
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <build_depend>message_generation</build_depend>
+  <depend>kortex_api</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>control_msgs</depend>
+  <depend>controller_manager_msgs</depend>
+  <depend>hardware_interface</depend>
+  <depend>angles</depend>
+  <depend>actionlib</depend>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>kdl_parser</depend>
+  <depend>message_generation</depend>
+  <depend>urdf</depend>
+  <depend>controller_manager</depend>
   <exec_depend>message_runtime</exec_depend>
 
   <depend>control_toolbox</depend>

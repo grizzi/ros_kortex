@@ -18,23 +18,22 @@
 
 #include <thread>
 
-#include "SessionManager.h"
-#include "TransportClientTcp.h"
-#include "TransportClientUdp.h"
-#include "RouterClient.h"
+#include "kortex_api/client/SessionManager.h"
+#include "kortex_api/client/TransportClientTcp.h"
+#include "kortex_api/client/TransportClientUdp.h"
+#include "kortex_api/client/RouterClient.h"
 
-#include "ActuatorConfigClientRpc.h"
-#include "BaseClientRpc.h"
-#include "DeviceConfigClientRpc.h"
-#include "DeviceManagerClientRpc.h"
-#include "InterconnectConfigClientRpc.h"
-#include "VisionConfigClientRpc.h"
-#include "BaseCyclicClientRpc.h"
-#include "SessionManager.h"
+#include "kortex_api/client_stubs/ActuatorConfigClientRpc.h"
+#include "kortex_api/client_stubs/BaseClientRpc.h"
+#include "kortex_api/client_stubs/DeviceConfigClientRpc.h"
+#include "kortex_api/client_stubs/DeviceManagerClientRpc.h"
+#include "kortex_api/client_stubs/InterconnectConfigClientRpc.h"
+#include "kortex_api/client_stubs/VisionConfigClientRpc.h"
+#include "kortex_api/client_stubs/BaseCyclicClientRpc.h"
 
 #include "kortex_driver/non-generated/kortex_math_util.h"
 
-#include "kortex_driver/BaseCyclic_Feedback.h"
+#include "kortex_driver/BaseCyclic_Feedback.h" // ros msg
 #include "kortex_driver/generated/robot/basecyclic_ros_converter.h"
 
 #include "kortex_driver/generated/robot/actuatorconfig_services.h"

@@ -20,9 +20,9 @@
 #include <mutex>
 #include <thread>
 
-#include "BaseClientRpc.h"
-#include "BaseCyclicClientRpc.h"
-#include "Errors.pb.h"
+#include "kortex_api/client_stubs/BaseClientRpc.h"
+#include "kortex_api/client_stubs/BaseCyclicClientRpc.h"
+#include "kortex_api/messages/Errors.pb.h"
 
 #include "kortex_math_util.h"
 

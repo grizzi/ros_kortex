@@ -4,7 +4,10 @@ project(kortex_driver)
 add_compile_options(-std=c++17)
 add_definitions(-D_OS_UNIX)
 
-option(USE_CONAN "Use the Conan package manager to automatically fetch the Kortex API" ON)
+option(USE_CONAN "Use the Conan package manager to automatically fetch the Kortex API" OFF)
+if (USE_CONAN)
+  message("Using catkin. CONAN disabled.")
+endif()
 
 if(NOT CONAN_TARGET_PLATFORM)
   set(CONAN_TARGET_PLATFORM "x86")
@@ -17,7 +20,23 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ## find catkin and any catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs std_srvs control_toolbox controller_manager_msgs message_generation actionlib control_msgs urdf moveit_ros_planning_interface controller_manager hardware_interface angles)
+set(PACKAGE_DEPENDENCIES
+  kortex_api
+  roscpp
+  rospy
+  std_msgs
+  std_srvs
+  control_toolbox
+  controller_manager_msgs
+  message_generation
+  actionlib
+  control_msgs
+  urdf
+  moveit_ros_planning_interface
+  controller_manager
+  hardware_interface angles)
+
+find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
 find_package(Boost REQUIRED COMPONENTS system)
 
 file(GLOB_RECURSE generated_files RELATIVE ${PROJECT_SOURCE_DIR} "src/generated/robot/*.cpp" "src/generated/simulation/*.cpp")
@@ -62,7 +81,7 @@ generate_messages(DEPENDENCIES std_msgs)
 catkin_package(
         INCLUDE_DIRS include
         LIBRARIES kortex_arm_driver_implementation
-        CATKIN_DEPENDS ${PROJECT_DEPENDENCIES}
+        CATKIN_DEPENDS ${PACKAGE_DEPENDENCIES} message_runtime
 )
 if(USE_CONAN)
   # Include conan.cmake module and download Kortex API from artifactory
@@ -105,21 +124,22 @@ include_directories(include ${Boost_INCLUDE_DIRS})
 include_directories(include ${PROJECT_SOURCE_DIR}/src)
 include_directories(include ${PROJECT_SOURCE_DIR}/include)
 
-if(NOT USE_CONAN)
-  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client)
-  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client_stubs)
-  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/messages)
-  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/common)
-  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include)
-  link_directories(${PROJECT_SOURCE_DIR}/../kortex_api/lib/release)
-endif()
+#if(NOT USE_CONAN)
+#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client)
+#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client_stubs)
+#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/messages)
+#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/common)
+#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include)
+#  link_directories(${PROJECT_SOURCE_DIR}/../kortex_api/lib/release)
+#endif()
 
 # Generated files library
 add_library(kortex_driver_generated_files ${generated_files})
 if(USE_CONAN)
   target_link_libraries(kortex_driver_generated_files CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov)
 else()
-  target_link_libraries(kortex_driver_generated_files KortexApiCpp ${catkin_LIBRARIES} gcov)
+  #target_link_libraries(kortex_driver_generated_files KortexApiCpp ${catkin_LIBRARIES} gcov)
+  target_link_libraries(kortex_driver_generated_files ${catkin_LIBRARIES} gcov)
 endif()
 add_dependencies(kortex_driver_generated_files ${PROJECT_NAME}_gencpp)
 # Remove deprecation warnings from Kortex API
@@ -130,7 +150,8 @@ add_library(kortex_arm_driver_implementation ${non_generated_files})
 if(USE_CONAN)
   target_link_libraries(kortex_arm_driver_implementation CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
 else()
-  target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
+  #target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
+  target_link_libraries(kortex_arm_driver_implementation ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
 endif()
 add_dependencies(kortex_arm_driver_implementation kortex_driver_generated_files)
 
@@ -139,7 +160,8 @@ add_executable(kortex_arm_driver src/non-generated/main.cpp)
 if(USE_CONAN)
   target_link_libraries(kortex_arm_driver CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 else()
-  target_link_libraries(kortex_arm_driver KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
+#  target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
+  target_link_libraries(kortex_arm_driver ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 endif()
 add_dependencies(kortex_arm_driver kortex_arm_driver_implementation)
 
@@ -148,7 +170,8 @@ add_executable(kortex_ros_control src/non-generated/ros_control.cpp)
 if(USE_CONAN)
   target_link_libraries(kortex_ros_control CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 else()
-  target_link_libraries(kortex_ros_control KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
+#  target_link_libraries(kortex_ros_control KortexApiCpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
+  target_link_libraries(kortex_ros_control ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 endif()
 add_dependencies(kortex_ros_control kortex_arm_driver_implementation)
 

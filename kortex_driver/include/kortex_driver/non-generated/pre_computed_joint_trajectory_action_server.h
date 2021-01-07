@@ -19,9 +19,9 @@
 #include <chrono>
 #include <mutex>
 
-#include "BaseClientRpc.h"
-#include "BaseCyclicClientRpc.h"
-#include "Errors.pb.h"
+#include "kortex_api/client_stubs/BaseClientRpc.h"
+#include "kortex_api/client_stubs/BaseCyclicClientRpc.h"
+#include "kortex_api/messages/Errors.pb.h"
 #include "kortex_driver/non-generated/kortex_math_util.h"
 
 class PreComputedJointTrajectoryActionServer
