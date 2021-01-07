@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package>
+  <name>kortex_api</name>
+  <version>0.0.1</version>
+  <description> Catkinized kortex_api
+  </description>
+
+  <maintainer email="grizzi@ethz.ch">Giuseppe Rizzi</maintainer>
+  <license>BSD</license>
+
+  <url>https://github.com/Kinovarobotics/kortex</url>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
