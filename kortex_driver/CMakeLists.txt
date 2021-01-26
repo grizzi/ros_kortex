@@ -5,6 +5,7 @@ add_compile_options(-std=c++17)
 add_definitions(-D_OS_UNIX)
 
 option(USE_CONAN "Use the Conan package manager to automatically fetch the Kortex API" OFF)
+set(USE_CONAN OFF)
 if (USE_CONAN)
   message("Using catkin. CONAN disabled.")
 endif()
@@ -18,6 +19,8 @@ message("CONAN_TARGET_PLATFORM is ${CONAN_TARGET_PLATFORM}")
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
+
+set(API_LIB /home/giuseppe/kinova_ws/src/ros_kortex/kortex_api/lib/release/libKortexApiCpp.a)
 
 ## find catkin and any catkin packages
 set(PACKAGE_DEPENDENCIES
@@ -139,7 +142,7 @@ if(USE_CONAN)
   target_link_libraries(kortex_driver_generated_files CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov)
 else()
   #target_link_libraries(kortex_driver_generated_files KortexApiCpp ${catkin_LIBRARIES} gcov)
-  target_link_libraries(kortex_driver_generated_files ${catkin_LIBRARIES} gcov)
+  target_link_libraries(kortex_driver_generated_files ${API_LIB} ${catkin_LIBRARIES} gcov)
 endif()
 add_dependencies(kortex_driver_generated_files ${PROJECT_NAME}_gencpp)
 # Remove deprecation warnings from Kortex API

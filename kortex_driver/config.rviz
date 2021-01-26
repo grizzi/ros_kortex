@@ -4,12 +4,9 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
         - /TF1/Frames1
-        - /Odometry1/Shape1
-        - /Target Pose1
       Splitter Ratio: 0.5
-    Tree Height: 755
+    Tree Height: 746
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -75,109 +72,80 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        arm_base_link:
+        base_link:
+          Value: false
+        base_link_dummy:
+          Value: false
+        bracelet_link:
+          Value: false
+        camera_color_frame:
+          Value: false
+        camera_depth_frame:
+          Value: false
+        camera_link:
+          Value: false
+        end_effector_link:
+          Value: false
+        forearm_link:
+          Value: false
+        ft_sensor0:
           Value: true
-        arm_base_link_dummy:
+        half_arm_1_link:
           Value: false
-        arm_bracelet_link:
+        half_arm_2_link:
           Value: false
-        arm_camera_color_frame:
+        interconnect_link:
           Value: false
-        arm_camera_depth_frame:
+        shoulder_link:
           Value: false
-        arm_camera_link:
+        spherical_wrist_1_link:
           Value: false
-        arm_end_effector_link:
-          Value: true
-        arm_forearm_link:
+        spherical_wrist_2_link:
           Value: false
-        arm_half_arm_1_link:
-          Value: false
-        arm_half_arm_2_link:
-          Value: false
-        arm_left_inner_finger:
-          Value: false
-        arm_left_inner_finger_pad:
-          Value: false
-        arm_left_inner_knuckle:
-          Value: false
-        arm_left_outer_finger:
-          Value: false
-        arm_left_outer_knuckle:
-          Value: false
-        arm_right_inner_finger:
-          Value: false
-        arm_right_inner_finger_pad:
-          Value: false
-        arm_right_inner_knuckle:
-          Value: false
-        arm_right_outer_finger:
-          Value: false
-        arm_right_outer_knuckle:
-          Value: false
-        arm_robotiq_arg2f_base_link:
-          Value: false
-        arm_shoulder_link:
-          Value: false
-        arm_spherical_wrist_1_link:
-          Value: false
-        arm_spherical_wrist_2_link:
-          Value: false
-        arm_tool_frame:
-          Value: true
-        valve_base:
-          Value: true
-        valve_est_frame:
+        tool_frame:
           Value: true
         world:
           Value: true
+      Marker Alpha: 1
       Marker Scale: 0.5
       Name: TF
-      Show Arrows: true
+      Show Arrows: false
       Show Axes: true
       Show Names: true
       Tree:
-        arm_base_link:
-          arm_base_link_dummy:
-            {}
-          arm_shoulder_link:
-            arm_half_arm_1_link:
-              arm_half_arm_2_link:
-                arm_forearm_link:
-                  arm_spherical_wrist_1_link:
-                    arm_spherical_wrist_2_link:
-                      arm_bracelet_link:
-                        arm_end_effector_link:
-                          arm_camera_color_frame:
-                            {}
-                          arm_camera_depth_frame:
-                            {}
-                          arm_camera_link:
-                            {}
-                          arm_robotiq_arg2f_base_link:
-                            arm_left_inner_knuckle:
-                              {}
-                            arm_left_outer_knuckle:
-                              arm_left_outer_finger:
-                                arm_left_inner_finger:
-                                  arm_left_inner_finger_pad:
-                                    {}
-                            arm_right_inner_knuckle:
-                              {}
-                            arm_right_outer_knuckle:
-                              arm_right_outer_finger:
-                                arm_right_inner_finger:
-                                  arm_right_inner_finger_pad:
-                                    {}
-                          arm_tool_frame:
-                            {}
-          valve_base:
-            {}
-          valve_est_frame:
-            {}
         world:
-          {}
+          base_link:
+            base_link_dummy:
+              {}
+            shoulder_link:
+              half_arm_1_link:
+                half_arm_2_link:
+                  forearm_link:
+                    spherical_wrist_1_link:
+                      spherical_wrist_2_link:
+                        bracelet_link:
+                          end_effector_link:
+                            camera_color_frame:
+                              {}
+                            camera_depth_frame:
+                              {}
+                            camera_link:
+                              {}
+                            ft_sensor0:
+                              {}
+                            interconnect_link:
+                              {}
+                            tool_frame:
+                              {}
       Update Interval: 0
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /elevated_area_marker
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
       Value: true
     - Angle Tolerance: 0.10000000149011612
       Class: rviz/Odometry
@@ -200,6 +168,7 @@ Visualization Manager:
       Keep: 100
       Name: Odometry
       Position Tolerance: 0.10000000149011612
+      Queue Size: 10
       Shape:
         Alpha: 1
         Axes Length: 1
@@ -213,14 +182,6 @@ Visualization Manager:
       Topic: /camera/odom/sample
       Unreliable: false
       Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /elevated_area_marker
-      Name: Marker
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -231,122 +192,75 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        arm_base_link:
+        base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_base_link_dummy:
+        base_link_dummy:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        arm_bracelet_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_camera_color_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_end_effector_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        arm_forearm_link:
+        bracelet_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_half_arm_1_link:
+        camera_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        end_effector_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        forearm_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_half_arm_2_link:
+        ft_sensor0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        half_arm_1_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_left_inner_finger:
+        half_arm_2_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_left_inner_finger_pad:
+        interconnect_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        shoulder_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_left_inner_knuckle:
+        spherical_wrist_1_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_left_outer_finger:
+        spherical_wrist_2_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_left_outer_knuckle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_right_inner_finger:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_right_inner_finger_pad:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_right_inner_knuckle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_right_outer_finger:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_right_outer_knuckle:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_robotiq_arg2f_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_shoulder_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_spherical_wrist_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_spherical_wrist_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        arm_tool_frame:
+        tool_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -447,7 +361,7 @@ Visualization Manager:
       Show Axes: false
       Show Descriptions: true
       Show Visual Aids: false
-      Update Topic: /interactive_marker/update
+      Update Topic: /simple_marker/update
       Value: true
     - Alpha: 1
       Axes Length: 0.10000000149011612
@@ -458,6 +372,7 @@ Visualization Manager:
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
       Name: Current Pose
+      Queue Size: 10
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
       Shape: Axes
@@ -473,17 +388,28 @@ Visualization Manager:
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
       Name: Target Pose
+      Queue Size: 10
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
       Shape: Axes
       Topic: /target_pose
       Unreliable: false
       Value: true
+    - Alpha: 1
+      Class: rviz_plugin_tutorials/Imu
+      Color: 204; 51; 204
+      Enabled: false
+      History Length: 1
+      Name: Imu
+      Queue Size: 10
+      Topic: /kinova_ros_control/imu
+      Unreliable: false
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: arm_base_link
+    Fixed Frame: base_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -507,12 +433,13 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.044861078262329
+      Distance: 1.9800127744674683
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Field of View: 0.7853981852531433
       Focal Point:
         X: -0.05096074193716049
         Y: -0.16518890857696533
@@ -522,22 +449,21 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.27039834856987
+      Pitch: 0.22539854049682617
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 2.013584613800049
+      Yaw: 0.7835849523544312
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1052
+  Height: 1043
   Hide Left Dock: false
   Hide Right Dock: true
   MotionPlanning:
     collapsed: false
   MotionPlanning - Trajectory Slider:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd0000000400000000000002750000037efc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d0000037e000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670000000226000001950000018900fffffffb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000004100ffffff000000010000010f000000ebfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000000eb000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d0065010000000000000780000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000005050000037e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000027500000375fc020000000dfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000375000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670000000202000001950000018900fffffffb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000004100fffffffb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670100000203000001940000000000000000fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000000000010000010f000000ebfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000000eb000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d0065010000000000000780000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000005050000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -547,5 +473,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1920
-  X: 0
+  X: 1920
   Y: 0

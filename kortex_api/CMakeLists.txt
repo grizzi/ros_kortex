@@ -13,7 +13,7 @@ catkin_package(
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS})
-link_libraries(lib/${CMAKE_BUILD_TYPE}/libKortexApiCpp.a)
+link_libraries(lib/release/libKortexApiCpp.a)
 
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}

@@ -301,7 +301,8 @@
       </collision>
     </link>
     </xacro:unless>
-    <joint
+
+      <joint
       name="${prefix}joint_7"
       type="revolute">
       <origin xyz="0 -0.10593 -0.00017505" rpy="-1.5708 -5.5511E-17 9.6396E-17" />
@@ -348,4 +349,23 @@
       </joint>
     </xacro:if>
   </xacro:macro>
+
+  <!--      Interconnect link : where the imu is placed-->
+      <link name="${prefix}interconnect_link" />
+      <joint name="${prefix}interconnect_joint" type="fixed">
+        <parent link="${prefix}end_effector_link"/>
+        <child link="${prefix}interconnect_link"/>
+        <origin xyz="0 0 0" rpy="3.14159 0 0.0" />
+      </joint>
+
+
+<!--      FT Sensor link : aligned with the interconnect link -->
+      <link name="ft_sensor0" />
+      <joint name="${prefix}ft_sensor_joint" type="fixed">
+        <parent link="${prefix}end_effector_link"/>
+        <child link="ft_sensor0"/>
+        <origin xyz="0 0 0" rpy="0 0 -1.57079" />
+      </joint>
+
+   
 </robot>

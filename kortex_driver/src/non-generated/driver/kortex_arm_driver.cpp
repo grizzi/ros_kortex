@@ -541,6 +541,7 @@ void KortexArmDriver::initRosServices()
 
 bool KortexArmDriver::calibrateZeroPosition(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res){
   m_record_zero_position = true;
+  return true;
 }
 
 void KortexArmDriver::startActionServers()
