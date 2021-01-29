@@ -12,6 +12,7 @@
 
 #include "kortex_driver/non-generated/kortex_arm_driver.h"
 #include "angles/angles.h"
+#include "yaml-cpp/yaml.h"
 
 KortexArmDriver::KortexArmDriver(ros::NodeHandle nh):   m_node_handle(nh), 
                                                         m_node_is_running(true), 
@@ -75,6 +76,18 @@ KortexArmDriver::~KortexArmDriver()
     {
         m_publish_feedback_thread.join();
     }
+
+    // save the current robot joint position
+    YAML::Node config = YAML::LoadFile(calibration_file_);
+    for (size_t i=0; i<7; i++){
+        double joint_position = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback_.actuators[i].position) - m_zero_position[i]);
+        config["last_joint_position"][i] = joint_position;
+    }
+    std::ofstream fout(calibration_file_);
+    fout << config;
+    ROS_INFO("Correctly saved configuration to yaml file.");
+
+
 
     delete m_actuator_config_ros_services;
     delete m_base_ros_services;
@@ -291,6 +304,11 @@ void KortexArmDriver::parseRosArguments()
             throw new std::runtime_error(error_string);
         }
     }
+
+    if (!ros::param::get("~calibration_file", calibration_file_)){
+        throw new std::runtime_error("Failed to get calibration_file parameter.");
+    }
+
 }
 
 void KortexArmDriver::initApi()
@@ -601,6 +619,20 @@ void KortexArmDriver::publishRobotFeedback()
     Kinova::Api::BaseCyclic::Feedback feedback_from_api;
     sensor_msgs::JointState joint_state;
 
+    ROS_INFO("Initializing joint bias...");
+    feedback_from_api = m_base_cyclic->RefreshFeedback();
+    ToRosData(feedback_from_api, base_feedback_);
+
+    YAML::Node config = YAML::LoadFile(calibration_file_);
+    for (size_t i=0; i<7; i++){
+      double last_joint_position = config["last_joint_position"][i].as<double>();
+      double to = base_feedback_.actuators[i].position * M_PI/180.0;
+      double from = last_joint_position;
+      m_zero_position[i] = angles::shortest_angular_distance(from, to);
+      m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
+      ROS_INFO_STREAM("Updating bias for joint " << i << " -> current is: " << to << ", true is: " << last_joint_position << " rad.");
+    }
+
     ros::Rate rate(m_cyclic_data_publish_rate);
     while (m_node_is_running)
     {
@@ -635,15 +667,14 @@ void KortexArmDriver::publishRobotFeedback()
         }
 
         m_consecutive_base_cyclic_timeouts = 0;
-        kortex_driver::BaseCyclic_Feedback base_feedback;
-        ToRosData(feedback_from_api, base_feedback);
+        ToRosData(feedback_from_api, base_feedback_);
 
         // save bias if requested
         if (m_record_zero_position){
           std::unique_lock<std::shared_mutex> lock(m_zero_position_mutex);
           ROS_INFO("Resetting the zero position.");
           for (size_t i=0; i<7; i++){
-            double to = base_feedback.actuators[i].position * M_PI/180.0;
+            double to = base_feedback_.actuators[i].position * M_PI/180.0;
             double from = 0.0;
             m_zero_position[i] = angles::shortest_angular_distance(from, to);
             m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
@@ -652,36 +683,36 @@ void KortexArmDriver::publishRobotFeedback()
           m_record_zero_position = false;
         }
 
-        joint_state.name.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
-        joint_state.position.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
-        joint_state.velocity.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
-        joint_state.effort.resize(base_feedback.actuators.size() + base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
+        joint_state.name.resize(base_feedback_.actuators.size() + base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
+        joint_state.position.resize(base_feedback_.actuators.size() + base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
+        joint_state.velocity.resize(base_feedback_.actuators.size() + base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
+        joint_state.effort.resize(base_feedback_.actuators.size() + base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size());
         joint_state.header.stamp = ros::Time::now();
 
-        for (int i = 0; i < base_feedback.actuators.size(); i++)
+        for (int i = 0; i < base_feedback_.actuators.size(); i++)
         {
             std::shared_lock<std::shared_mutex> lock(m_zero_position_mutex);
             joint_state.name[i] = m_arm_joint_names[i];
-            joint_state.position[i] = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback.actuators[i].position) - m_zero_position[i]);
-            joint_state.velocity[i] = m_math_util.toRad(base_feedback.actuators[i].velocity);
-            joint_state.effort[i] = base_feedback.actuators[i].torque;
+            joint_state.position[i] = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback_.actuators[i].position) - m_zero_position[i]);
+            joint_state.velocity[i] = m_math_util.toRad(base_feedback_.actuators[i].velocity);
+            joint_state.effort[i] = base_feedback_.actuators[i].torque;
         }
 
         if (isGripperPresent())
         {
-            for (int i = 0; i < base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size(); i++)
+            for (int i = 0; i < base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor.size(); i++)
             {
-                int joint_state_index = base_feedback.actuators.size() + i;
+                int joint_state_index = base_feedback_.actuators.size() + i;
                 joint_state.name[joint_state_index] = m_gripper_joint_names[i];
                 // Arm feedback is between 0 and 100, and limits in URDF are specified in gripper_joint_limits_min[i] and gripper_joint_limits_max[i] parameters
-                joint_state.position[joint_state_index] = m_math_util.absolute_position_from_relative(base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor[i].position / 100.0, m_gripper_joint_limits_min[i], m_gripper_joint_limits_max[i]);
-                joint_state.velocity[joint_state_index] = base_feedback.interconnect.oneof_tool_feedback.gripper_feedback[0].motor[i].velocity;
+                joint_state.position[joint_state_index] = m_math_util.absolute_position_from_relative(base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor[i].position / 100.0, m_gripper_joint_limits_min[i], m_gripper_joint_limits_max[i]);
+                joint_state.velocity[joint_state_index] = base_feedback_.interconnect.oneof_tool_feedback.gripper_feedback[0].motor[i].velocity;
                 // Not supported for now
                 joint_state.effort[joint_state_index] = 0.0;
             }
         }
 
-        m_pub_base_feedback.publish(base_feedback);
+        m_pub_base_feedback.publish(base_feedback_);
         m_pub_joint_state.publish(joint_state);
 
         rate.sleep();

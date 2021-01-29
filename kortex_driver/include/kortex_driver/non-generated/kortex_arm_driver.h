@@ -175,6 +175,9 @@ class KortexArmDriver
     double m_zero_position[7];
     std::atomic_bool m_record_zero_position;
     bool calibrateZeroPosition(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
+
+    kortex_driver::BaseCyclic_Feedback base_feedback_; 
+    std::string calibration_file_;
 };
 
 #endif

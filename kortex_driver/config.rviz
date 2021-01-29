@@ -4,6 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
         - /TF1/Frames1
       Splitter Ratio: 0.5
     Tree Height: 746
@@ -72,37 +73,37 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base_link:
-          Value: false
-        base_link_dummy:
-          Value: false
-        bracelet_link:
-          Value: false
-        camera_color_frame:
-          Value: false
-        camera_depth_frame:
-          Value: false
-        camera_link:
-          Value: false
-        end_effector_link:
-          Value: false
-        forearm_link:
-          Value: false
-        ft_sensor0:
+        arm_base_link:
           Value: true
-        half_arm_1_link:
-          Value: false
-        half_arm_2_link:
-          Value: false
-        interconnect_link:
-          Value: false
-        shoulder_link:
-          Value: false
-        spherical_wrist_1_link:
-          Value: false
-        spherical_wrist_2_link:
-          Value: false
-        tool_frame:
+        arm_base_link_dummy:
+          Value: true
+        arm_bracelet_link:
+          Value: true
+        arm_camera_color_frame:
+          Value: true
+        arm_camera_depth_frame:
+          Value: true
+        arm_camera_link:
+          Value: true
+        arm_end_effector_link:
+          Value: true
+        arm_forearm_link:
+          Value: true
+        arm_half_arm_1_link:
+          Value: true
+        arm_half_arm_2_link:
+          Value: true
+        arm_interconnect_link:
+          Value: true
+        arm_shoulder_link:
+          Value: true
+        arm_spherical_wrist_1_link:
+          Value: true
+        arm_spherical_wrist_2_link:
+          Value: true
+        arm_tool_frame:
+          Value: true
+        ft_sensor0:
           Value: true
         world:
           Value: true
@@ -114,28 +115,28 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          base_link:
-            base_link_dummy:
+          arm_base_link:
+            arm_base_link_dummy:
               {}
-            shoulder_link:
-              half_arm_1_link:
-                half_arm_2_link:
-                  forearm_link:
-                    spherical_wrist_1_link:
-                      spherical_wrist_2_link:
-                        bracelet_link:
-                          end_effector_link:
-                            camera_color_frame:
+            arm_shoulder_link:
+              arm_half_arm_1_link:
+                arm_half_arm_2_link:
+                  arm_forearm_link:
+                    arm_spherical_wrist_1_link:
+                      arm_spherical_wrist_2_link:
+                        arm_bracelet_link:
+                          arm_end_effector_link:
+                            arm_camera_color_frame:
                               {}
-                            camera_depth_frame:
+                            arm_camera_depth_frame:
                               {}
-                            camera_link:
+                            arm_camera_link:
+                              {}
+                            arm_interconnect_link:
+                              {}
+                            arm_tool_frame:
                               {}
                             ft_sensor0:
-                              {}
-                            interconnect_link:
-                              {}
-                            tool_frame:
                               {}
       Update Interval: 0
       Value: true
@@ -192,75 +193,75 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_link:
+        arm_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        base_link_dummy:
+        arm_base_link_dummy:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        bracelet_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        camera_color_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        end_effector_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        forearm_link:
+        arm_bracelet_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
+        arm_camera_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        arm_camera_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        arm_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        arm_end_effector_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        arm_forearm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_half_arm_1_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_half_arm_2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_interconnect_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        arm_shoulder_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_spherical_wrist_1_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_spherical_wrist_2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        arm_tool_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         ft_sensor0:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        half_arm_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        half_arm_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        interconnect_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        shoulder_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        spherical_wrist_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        spherical_wrist_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tool_frame:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -409,7 +410,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: base_link
+    Fixed Frame: world
     Frame Rate: 30
   Name: root
   Tools:
@@ -449,9 +450,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.22539854049682617
+      Pitch: 0.405398428440094
       Target Frame: <Fixed Frame>
-      Yaw: 0.7835849523544312
+      Yaw: 1.2185845375061035
     Saved: ~
 Window Geometry:
   Displays:

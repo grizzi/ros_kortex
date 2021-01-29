@@ -41,6 +41,7 @@ set(PACKAGE_DEPENDENCIES
 
 find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
 find_package(Boost REQUIRED COMPONENTS system)
+find_package(yaml-cpp REQUIRED)
 
 file(GLOB_RECURSE generated_files RELATIVE ${PROJECT_SOURCE_DIR} "src/generated/robot/*.cpp" "src/generated/simulation/*.cpp")
 file(GLOB_RECURSE non_generated_files RELATIVE ${PROJECT_SOURCE_DIR} "src/non-generated/driver/*.cpp")
@@ -85,6 +86,7 @@ catkin_package(
         INCLUDE_DIRS include
         LIBRARIES kortex_arm_driver_implementation
         CATKIN_DEPENDS ${PACKAGE_DEPENDENCIES} message_runtime
+        DEPENDS yaml-cpp
 )
 if(USE_CONAN)
   # Include conan.cmake module and download Kortex API from artifactory
@@ -154,7 +156,7 @@ if(USE_CONAN)
   target_link_libraries(kortex_arm_driver_implementation CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
 else()
   #target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
-  target_link_libraries(kortex_arm_driver_implementation ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
+  target_link_libraries(kortex_arm_driver_implementation ${catkin_LIBRARIES} gcov kortex_driver_generated_files yaml-cpp)
 endif()
 add_dependencies(kortex_arm_driver_implementation kortex_driver_generated_files)
 
