@@ -2,7 +2,7 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_robot" params="arm gripper dof vision sim prefix">
+    <xacro:macro name="load_robot" params="arm gripper dof vision sim prefix tool_frame_offset">
             
         <!-- Files to include -->
         <xacro:include filename="$(find kortex_description)/arms/${arm}/${dof}dof/urdf/${arm}_macro.xacro" />
