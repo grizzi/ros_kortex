@@ -4,25 +4,9 @@ project(kortex_driver)
 add_compile_options(-std=c++17)
 add_definitions(-D_OS_UNIX)
 
-option(USE_CONAN "Use the Conan package manager to automatically fetch the Kortex API" OFF)
-set(USE_CONAN OFF)
-if (USE_CONAN)
-  message("Using catkin. CONAN disabled.")
-endif()
-
-if(NOT CONAN_TARGET_PLATFORM)
-  set(CONAN_TARGET_PLATFORM "x86")
-endif()
-message("CONAN_TARGET_PLATFORM is ${CONAN_TARGET_PLATFORM}")
-
-# Explicitely specify the build type in case the user did not do it
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
 
 set(API_LIB /home/giuseppe/kinova_ws/src/ros_kortex/kortex_api/lib/release/libKortexApiCpp.a)
 
-## find catkin and any catkin packages
 set(PACKAGE_DEPENDENCIES
   kortex_api
   roscpp
@@ -37,7 +21,8 @@ set(PACKAGE_DEPENDENCIES
   urdf
   moveit_ros_planning_interface
   controller_manager
-  hardware_interface angles)
+  hardware_interface
+  angles)
 
 find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
 find_package(Boost REQUIRED COMPONENTS system)
@@ -88,86 +73,28 @@ catkin_package(
         CATKIN_DEPENDS ${PACKAGE_DEPENDENCIES} message_runtime
         DEPENDS yaml-cpp
 )
-if(USE_CONAN)
-  # Include conan.cmake module and download Kortex API from artifactory
-  include(${PROJECT_SOURCE_DIR}/cmake/conan.cmake)
-  conan_check(REQUIRED)
-  conan_add_remote(NAME kinova_public
-                  URL https://artifactory.kinovaapps.com/artifactory/api/conan/conan-public)
-  if("${CONAN_TARGET_PLATFORM}" STREQUAL "x86")
-    conan_cmake_run(CONANFILE conanfile.py
-                    UPDATE
-                    BASIC_SETUP CMAKE_TARGETS
-                    NO_OUTPUT_DIRS
-                    SETTINGS kortex_api_cpp:compiler=gcc kortex_api_cpp:compiler.version=5 kortex_api_cpp:compiler.libcxx=libstdc++11)
-  elseif("${CONAN_TARGET_PLATFORM}" STREQUAL "artik710")
-    conan_cmake_run(CONANFILE conanfile.py
-                    UPDATE
-                    BASIC_SETUP CMAKE_TARGETS
-                    NO_OUTPUT_DIRS
-                    SETTINGS kortex_api_cpp:arch=armv7 kortex_api_cpp:compiler=gcc kortex_api_cpp:compiler.version=5 kortex_api_cpp:compiler.libcxx=libstdc++11
-                    OPTIONS kortex_api_cpp:target=artik710)
-  elseif("${CONAN_TARGET_PLATFORM}" STREQUAL "imx6")
-    conan_cmake_run(CONANFILE conanfile.py
-                    UPDATE
-                    BASIC_SETUP CMAKE_TARGETS
-                    NO_OUTPUT_DIRS
-                    SETTINGS kortex_api_cpp:arch=armv7 kortex_api_cpp:compiler=gcc kortex_api_cpp:compiler.version=6.4 kortex_api_cpp:compiler.libcxx=libstdc++11
-                    OPTIONS kortex_api_cpp:target=imx6)
-  elseif("${CONAN_TARGET_PLATFORM}" STREQUAL "jetson")
-    conan_cmake_run(CONANFILE conanfile.py
-                    UPDATE
-                    BASIC_SETUP CMAKE_TARGETS
-                    NO_OUTPUT_DIRS
-                    SETTINGS kortex_api_cpp:arch=armv7 kortex_api_cpp:compiler=gcc kortex_api_cpp:compiler.version=7 kortex_api_cpp:compiler.libcxx=libstdc++11
-                    OPTIONS kortex_api_cpp:target=jetson)
-  endif()
-endif()
 
 include_directories(include ${catkin_INCLUDE_DIRS})
-include_directories(include ${Boost_INCLUDE_DIRS})
 include_directories(include ${PROJECT_SOURCE_DIR}/src)
 include_directories(include ${PROJECT_SOURCE_DIR}/include)
 
-#if(NOT USE_CONAN)
-#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client)
-#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/client_stubs)
-#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/messages)
-#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include/common)
-#  include_directories(include ${PROJECT_SOURCE_DIR}/../kortex_api/include)
-#  link_directories(${PROJECT_SOURCE_DIR}/../kortex_api/lib/release)
-#endif()
-
 # Generated files library
 add_library(kortex_driver_generated_files ${generated_files})
-if(USE_CONAN)
-  target_link_libraries(kortex_driver_generated_files CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov)
-else()
-  #target_link_libraries(kortex_driver_generated_files KortexApiCpp ${catkin_LIBRARIES} gcov)
-  target_link_libraries(kortex_driver_generated_files ${API_LIB} ${catkin_LIBRARIES} gcov)
-endif()
+target_link_libraries(kortex_driver_generated_files ${API_LIB} ${catkin_LIBRARIES} gcov)
 add_dependencies(kortex_driver_generated_files ${PROJECT_NAME}_gencpp)
+
 # Remove deprecation warnings from Kortex API
 target_compile_options(kortex_driver_generated_files PRIVATE "-Wno-deprecated-declarations")
 
 # Non-generated files library (driver implementation)
 add_library(kortex_arm_driver_implementation ${non_generated_files})
-if(USE_CONAN)
-  target_link_libraries(kortex_arm_driver_implementation CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
-else()
-  #target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
-  target_link_libraries(kortex_arm_driver_implementation ${catkin_LIBRARIES} gcov kortex_driver_generated_files yaml-cpp)
-endif()
+target_link_libraries(kortex_arm_driver_implementation ${catkin_LIBRARIES} gcov ${API_LIB} kortex_driver_generated_files yaml-cpp)
 add_dependencies(kortex_arm_driver_implementation kortex_driver_generated_files)
 
 # Entry point executable for the driver
 add_executable(kortex_arm_driver src/non-generated/main.cpp)
-if(USE_CONAN)
-  target_link_libraries(kortex_arm_driver CONAN_PKG::kortex_api_cpp ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
-else()
-#  target_link_libraries(kortex_arm_driver_implementation KortexApiCpp ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
-  target_link_libraries(kortex_arm_driver ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
-endif()
+target_link_libraries(kortex_arm_driver_implementation ${API_LIB} ${catkin_LIBRARIES} gcov kortex_driver_generated_files)
+target_link_libraries(kortex_arm_driver ${catkin_LIBRARIES} gcov kortex_arm_driver_implementation)
 add_dependencies(kortex_arm_driver kortex_arm_driver_implementation)
 
 ## Add gtest based cpp test target and link libraries

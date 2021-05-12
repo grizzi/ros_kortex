@@ -78,14 +78,16 @@ KortexArmDriver::~KortexArmDriver()
     }
 
     // save the current robot joint position
-    YAML::Node config = YAML::LoadFile(calibration_file_);
-    for (size_t i=0; i<7; i++){
+    if (m_is_real_robot){
+      YAML::Node config = YAML::LoadFile(calibration_file_);
+      for (size_t i=0; i<7; i++){
         double joint_position = m_math_util.wrapRadiansFromMinusPiToPi(m_math_util.toRad(base_feedback_.actuators[i].position) - m_zero_position[i]);
         config["last_joint_position"][i] = joint_position;
+      }
+      std::ofstream fout(calibration_file_);
+      fout << config;
+      ROS_INFO("Correctly saved configuration to yaml file.");
     }
-    std::ofstream fout(calibration_file_);
-    fout << config;
-    ROS_INFO("Correctly saved configuration to yaml file.");
 
 
 
@@ -141,17 +143,23 @@ KortexArmDriver::~KortexArmDriver()
 }
 
 void KortexArmDriver::setZerosFromParam(){
-  for (size_t i=0; i<7; i++)
+  if (m_is_real_robot)
   {
+    for (size_t i=0; i<7; i++)
+    {
       std::string param_name = "~joint_zeros/" + m_arm_joint_names[i];
       if (!ros::param::get(param_name, m_zero_position[i])){
-          std::string error_string = "Could not find param: " + param_name;
-          ROS_ERROR_STREAM(error_string);
-          throw new std::runtime_error(error_string);
+        std::string error_string = "Could not find param: " + param_name;
+        ROS_ERROR_STREAM(error_string);
+        throw new std::runtime_error(error_string);
       }
 
       m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
       ROS_INFO_STREAM("Zeroing position for joint " << i << " -> zero is: " << m_zero_position[i] << " rad.");
+    }
+  }
+  else{
+    for (size_t i=0; i<7; i++) m_zero_position[i] = 0;
   }
 }
 
@@ -305,7 +313,7 @@ void KortexArmDriver::parseRosArguments()
         }
     }
 
-    if (!ros::param::get("~calibration_file", calibration_file_)){
+    if (m_is_real_robot && !ros::param::get("~calibration_file", calibration_file_)){
         throw new std::runtime_error("Failed to get calibration_file parameter.");
     }
 
@@ -619,18 +627,20 @@ void KortexArmDriver::publishRobotFeedback()
     Kinova::Api::BaseCyclic::Feedback feedback_from_api;
     sensor_msgs::JointState joint_state;
 
-    ROS_INFO("Initializing joint bias...");
-    feedback_from_api = m_base_cyclic->RefreshFeedback();
-    ToRosData(feedback_from_api, base_feedback_);
+    if (m_is_real_robot){
+      ROS_INFO("Initializing joint bias...");
+      feedback_from_api = m_base_cyclic->RefreshFeedback();
+      ToRosData(feedback_from_api, base_feedback_);
 
-    YAML::Node config = YAML::LoadFile(calibration_file_);
-    for (size_t i=0; i<7; i++){
-      double last_joint_position = config["last_joint_position"][i].as<double>();
-      double to = base_feedback_.actuators[i].position * M_PI/180.0;
-      double from = last_joint_position;
-      m_zero_position[i] = angles::shortest_angular_distance(from, to);
-      m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
-      ROS_INFO_STREAM("Updating bias for joint " << i << " -> current is: " << to << ", true is: " << last_joint_position << " rad.");
+      YAML::Node config = YAML::LoadFile(calibration_file_);
+      for (size_t i=0; i<7; i++){
+        double last_joint_position = config["last_joint_position"][i].as<double>();
+        double to = base_feedback_.actuators[i].position * M_PI/180.0;
+        double from = last_joint_position;
+        m_zero_position[i] = angles::shortest_angular_distance(from, to);
+        m_action_server_follow_joint_trajectory->set_joint_bias(i, m_zero_position[i]);
+        ROS_INFO_STREAM("Updating bias for joint " << i << " -> current is: " << to << ", true is: " << last_joint_position << " rad.");
+      }
     }
 
     ros::Rate rate(m_cyclic_data_publish_rate);

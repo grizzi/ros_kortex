@@ -20,3 +20,18 @@ install(DIRECTORY include/${PROJECT_NAME}/
 )
 
 
+#find_library(${PROJECT_NAME} NAMES KortexApiCpp PATHS "lib/release")
+#catkin_package(
+#        INCLUDE_DIRS include
+#        LIBRARIES ${PROJECT_NAME}
+#)
+#
+#add_library( ${PROJECT_NAME} EXCLUDE_FROM_ALL ${PVAPI} )
+#add_custom_command( TARGET PvAPI POST_BUILD COMMAND cp ${PVAPI} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/ )
+#set_target_properties(PvAPI PROPERTIES LINKER_LANGUAGE CXX )
+#
+#install( DIRECTORY include/${PROJECT_NAME}/
+#        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+#
+#install( FILES ${PVAPI}
+#        DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
